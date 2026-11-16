@@ -13,6 +13,7 @@ class Alpha2ForegroundIntegrationSourceTest {
         return new String(Files.readAllBytes(Paths.get("src/main/java/net/createmod/ponder/" + path)), StandardCharsets.UTF_8);
     }
     private static String method(String source, String declaration) {
+        source = source.replace("\r\n", "\n").replace('\r', '\n');
         int start = source.indexOf(declaration); assertTrue(start >= 0, declaration);
         int opening = source.indexOf('{', start), depth = 0;
         for (int i = opening; i < source.length(); i++) {
@@ -24,6 +25,14 @@ class Alpha2ForegroundIntegrationSourceTest {
     private static void before(String body, String first, String second) {
         int a = body.indexOf(first), b = body.indexOf(second);
         assertTrue(a >= 0, first); assertTrue(b >= 0, second); assertTrue(a < b, first + " must precede " + second);
+    }
+
+    @Test void multilineMethodContractsAcceptDifferentCheckoutLineEndings() {
+        String declaration = "void render(\n        int width)";
+        String expected = declaration + " { return; }";
+        for (String separator : new String[] {"\n", "\r\n", "\r"}) {
+            assertEquals(expected, method(expected.replace("\n", separator), declaration));
+        }
     }
 
     @Test void editorForegroundRunsAfterGeometryAndHostControlsInsideThePreviewOnly() throws Exception {
