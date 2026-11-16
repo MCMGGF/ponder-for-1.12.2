@@ -1,0 +1,10 @@
+// Unimined also adds this repository lazily, so filter existing and future entries.
+// Minecraft libraries and Fabric/Unimined tools must use their owning repositories.
+repositories.withType(org.gradle.api.artifacts.repositories.MavenArtifactRepository).configureEach { repository ->
+    if (repository.name == 'minecraftForge' || repository.url.host == 'maven.minecraftforge.net') {
+        repository.content {
+            includeGroup('net.minecraftforge')
+            includeGroup('de.oceanlabs.mcp')
+        }
+    }
+}

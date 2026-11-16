@@ -11,6 +11,7 @@ plugins {
 import org.jetbrains.gradle.ext.Gradle
 
 apply from: 'gradle/scripts/helpers.gradle'
+apply from: 'gradle/scripts/repository-routing.gradle'
 
 // Early Assertions
 assertProperty 'mod_version'

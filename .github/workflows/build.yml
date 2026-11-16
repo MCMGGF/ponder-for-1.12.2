@@ -30,9 +30,24 @@ jobs:
       - name: Test and build Cleanroom client and server shim
         run: ./gradlew.bat test remapJar sourcesJar forgeServerShimJar --stacktrace
 
+      - name: Verify repository routing during Forge outages
+        run: python scripts/test-repository-routing.py --work-dir "${{ runner.temp }}/ponder-repository-routing"
+
       - name: Upload Cleanroom artifacts
         uses: actions/upload-artifact@v4
         with:
           name: cleanroom-artifacts
           path: build/libs/*.jar
           if-no-files-found: error
+
+      - name: Upload build and repository diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: |
+            build/reports/tests/
+            build/test-results/
+            ${{ runner.temp }}/ponder-repository-routing/**/gradle.log
+            ${{ runner.temp }}/ponder-repository-routing/**/requests.json
+          if-no-files-found: warn
