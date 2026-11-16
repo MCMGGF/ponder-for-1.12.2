@@ -1,15 +1,15 @@
 # Notices
 
-This project is an independent Minecraft 1.12.2 rewrite of the official
-MIT-licensed Ponder project. The official project is used as the behavioral,
-API, translation, and visual-asset specification.
+The `cleanroom/0.3.x` branch carries the existing Minecraft 1.12.2 Cleanroom
+backport. Its original metadata credits wuxiaoya for backporting and
+maintenance and the upstream Ponder project for the original implementation.
+Those author and credit fields are retained in `gradle.properties`.
 
-- Official project: https://github.com/Creators-of-Create/Ponder
-- Official copyright: Copyright (c) 2022 The Create Team
-- License: MIT, reproduced in `LICENSE`
+- Upstream project: https://github.com/Creators-of-Create/Ponder
+- Upstream copyright: Copyright (c) 2022 The Create Team
+- The existing CleanroomMC MIT license notice is retained in `LICENSE`.
 
-No source code from an existing third-party Minecraft 1.12.2 Ponder backport
-is included or used as an implementation base.
-
-MixinBooter 11.2 is an external runtime dependency. It is downloaded for the
-development runtime and is not embedded in Ponder's release jar.
+The repository's `main` branch has a separate implementation and release line.
+This branch does not claim its independent-rewrite provenance or runtime/API
+compatibility. External CraftTweaker and game dependencies are not bundled
+with this source publication.

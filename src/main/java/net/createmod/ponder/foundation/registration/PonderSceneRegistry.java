@@ -1,166 +1,223 @@
 package net.createmod.ponder.foundation.registration;
 
-import java.io.IOException;
-import java.util.AbstractMap;
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.LinkedHashSet;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import net.createmod.ponder.api.level.PonderLevel;
 import net.createmod.ponder.api.registration.SceneRegistryAccess;
 import net.createmod.ponder.api.registration.StoryBoardEntry;
-import net.createmod.ponder.api.scene.SceneBuildingUtil;
 import net.createmod.ponder.foundation.PonderScene;
-import net.createmod.ponder.foundation.PonderSceneBuildingUtil;
-import net.createmod.ponder.foundation.structure.PonderStructure;
-import net.createmod.ponder.foundation.structure.PonderStructureLoader;
+import net.createmod.ponder.foundation.PonderSceneBuilder;
+import net.createmod.ponder.foundation.PonderSchematic;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.BlockPos;
 
-public final class PonderSceneRegistry implements SceneRegistryAccess {
-    private static final Logger LOGGER = LogManager.getLogger("PonderSceneRegistry");
-    private final PonderLocalization localization;
-    private final PonderStructureLoader loader;
+public class PonderSceneRegistry implements SceneRegistryAccess {
+
     private final Map<ResourceLocation, List<StoryBoardEntry>> scenes =
         new LinkedHashMap<ResourceLocation, List<StoryBoardEntry>>();
-    private boolean frozen;
+    private final Map<ResourceLocation, PonderComponentMatcher> componentMatchers =
+        new LinkedHashMap<ResourceLocation, PonderComponentMatcher>();
+    private final PonderLocalization localization;
+    private boolean allowRegistration = true;
 
     public PonderSceneRegistry(PonderLocalization localization) {
-        this(localization, new PonderStructureLoader());
-    }
-
-    public PonderSceneRegistry(PonderLocalization localization, PonderStructureLoader loader) {
         this.localization = localization;
-        this.loader = loader;
     }
 
-    public synchronized void clearRegistry() {
+    public void clearRegistry() {
         scenes.clear();
-        frozen = false;
+        componentMatchers.clear();
+        allowRegistration = true;
     }
 
-    public synchronized void freeze() {
-        frozen = true;
-    }
+    public void addStoryBoard(StoryBoardEntry entry) {
+        if (!allowRegistration) {
+            throw new IllegalStateException("Registration phase has already ended");
+        }
 
-    public synchronized void addStoryBoard(StoryBoardEntry entry) {
-        if (frozen) throw new IllegalStateException("Ponder scene registration is frozen");
         List<StoryBoardEntry> entries = scenes.get(entry.getComponent());
         if (entries == null) {
             entries = new ArrayList<StoryBoardEntry>();
             scenes.put(entry.getComponent(), entries);
         }
         entries.add(entry);
+
+        if (!componentMatchers.containsKey(entry.getComponent())) {
+            componentMatchers.put(entry.getComponent(), PonderComponentMatcher.simple(entry.getComponent()));
+        }
     }
 
-    @Override public synchronized boolean doScenesExistForId(ResourceLocation id) {
-        List<StoryBoardEntry> entries = scenes.get(id);
-        return entries != null && !entries.isEmpty();
+    public void registerComponentMatcher(ResourceLocation componentId, PonderComponentMatcher matcher) {
+        if (!allowRegistration) {
+            throw new IllegalStateException("Registration phase has already ended");
+        }
+        if (componentId == null || matcher == null) {
+            return;
+        }
+        componentMatchers.put(componentId, matcher);
     }
 
-    @Override public synchronized Collection<Map.Entry<ResourceLocation, StoryBoardEntry>> getRegisteredEntries() {
-        List<Map.Entry<ResourceLocation, StoryBoardEntry>> result =
-            new ArrayList<Map.Entry<ResourceLocation, StoryBoardEntry>>();
-        for (Map.Entry<ResourceLocation, List<StoryBoardEntry>> group : scenes.entrySet())
-            for (StoryBoardEntry entry : group.getValue())
-                result.add(new AbstractMap.SimpleImmutableEntry<ResourceLocation, StoryBoardEntry>(group.getKey(), entry));
-        return Collections.unmodifiableList(result);
+    public int getRegisteredEntryCount() {
+        int count = 0;
+        for (List<StoryBoardEntry> value : scenes.values()) {
+            count += value.size();
+        }
+        return count;
     }
 
-    private static List<PonderScene> applyOrdering(List<PonderScene> scenes) {
-        Map<ResourceLocation, PonderScene> byId = new LinkedHashMap<ResourceLocation, PonderScene>();
-        Map<PonderScene, Set<PonderScene>> outgoing = new LinkedHashMap<PonderScene, Set<PonderScene>>();
-        Map<PonderScene, Integer> incoming = new LinkedHashMap<PonderScene, Integer>();
-        for (PonderScene scene : scenes) { byId.put(scene.getId(), scene); outgoing.put(scene, new LinkedHashSet<PonderScene>()); incoming.put(scene, 0); }
-        for (PonderScene scene : scenes) {
-            for (StoryBoardEntry.SceneOrderingEntry order : scene.getOrderingEntries()) {
-                PonderScene other = byId.get(order.getSceneId());
-                if (other == null || other == scene) continue;
-                PonderScene before = order.getType() == StoryBoardEntry.SceneOrderingType.BEFORE ? scene : other;
-                PonderScene after = before == scene ? other : scene;
-                if (outgoing.get(before).add(after)) incoming.put(after, incoming.get(after) + 1);
+    @Override
+    public boolean doScenesExistForId(ResourceLocation id) {
+        if (id == null) {
+            return false;
+        }
+
+        List<StoryBoardEntry> directEntries = scenes.get(id);
+        if (directEntries != null && !directEntries.isEmpty()) {
+            return true;
+        }
+
+        for (PonderComponentMatcher matcher : componentMatchers.values()) {
+            if (id.equals(matcher.getItemId())) {
+                return true;
             }
         }
-        List<PonderScene> ordered = new ArrayList<PonderScene>();
-        Set<PonderScene> emitted = new LinkedHashSet<PonderScene>();
-        while (ordered.size() < scenes.size()) {
-            PonderScene next = null;
-            for (PonderScene candidate : scenes)
-                if (!emitted.contains(candidate) && incoming.get(candidate) == 0) { next = candidate; break; }
-            if (next == null) {
-                for (PonderScene candidate : scenes) if (!emitted.contains(candidate)) { next = candidate; break; }
-            }
-            emitted.add(next); ordered.add(next);
-            for (PonderScene target : outgoing.get(next)) incoming.put(target, Math.max(0, incoming.get(target) - 1));
+        return false;
+    }
+
+    @Override
+    public ResourceLocation resolveComponentId(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return null;
         }
-        return ordered;
+
+        ResourceLocation bestComponent = null;
+        int bestSpecificity = Integer.MIN_VALUE;
+        for (Map.Entry<ResourceLocation, PonderComponentMatcher> entry : componentMatchers.entrySet()) {
+            PonderComponentMatcher matcher = entry.getValue();
+            if (!matcher.matches(stack) || !hasMatchingEntry(entry.getKey(), stack)) {
+                continue;
+            }
+
+            int specificity = matcher.getSpecificity();
+            if (bestComponent == null || specificity > bestSpecificity) {
+                bestComponent = entry.getKey();
+                bestSpecificity = specificity;
+            }
+        }
+        return bestComponent;
     }
 
-    @Override public synchronized List<PonderScene> compile(ResourceLocation id) {
-        List<StoryBoardEntry> entries = scenes.get(id);
-        if (entries == null || entries.isEmpty()) return Collections.emptyList();
-        return compile(new ArrayList<StoryBoardEntry>(entries));
-    }
-
-    @Override public List<PonderScene> compile(Collection<StoryBoardEntry> entries) {
-        List<PonderScene> result = new ArrayList<PonderScene>();
+    private boolean hasMatchingEntry(ResourceLocation component, ItemStack stack) {
+        List<StoryBoardEntry> entries = scenes.get(component);
+        if (entries == null) return false;
         for (StoryBoardEntry entry : entries) {
-            result.add(compileEntry(entry));
+            try {
+                if (entry.matchesStack(stack)) return true;
+            } catch (RuntimeException invalidFilter) {
+                // Invalid author predicates are not treated as unfiltered scenes.
+            }
         }
-        return Collections.unmodifiableList(applyOrdering(result));
+        return false;
     }
 
-    public PonderScene compileEntry(StoryBoardEntry entry) {
-        PonderStructure structure;
-        try {
-            structure = loader.load(entry.getSchematicLocation());
-        } catch (IOException exception) {
-            LOGGER.error("Failed to load Ponder structure {}", entry.getSchematicLocation(), exception);
-            structure = PonderStructure.missing("failed to load " + entry.getSchematicLocation() + ": "
-                + exception.getMessage());
+    @Override
+    public Collection<Map.Entry<ResourceLocation, StoryBoardEntry>> getRegisteredEntries() {
+        List<Map.Entry<ResourceLocation, StoryBoardEntry>> entries =
+            new ArrayList<Map.Entry<ResourceLocation, StoryBoardEntry>>();
+        for (Map.Entry<ResourceLocation, List<StoryBoardEntry>> mapEntry : scenes.entrySet()) {
+            for (StoryBoardEntry storyBoardEntry : mapEntry.getValue()) {
+                entries.add(new SimpleImmutableEntry<ResourceLocation, StoryBoardEntry>(mapEntry.getKey(),
+                    storyBoardEntry));
+            }
         }
-        if (!structure.getDiagnostics().isEmpty())
-            LOGGER.warn("Ponder structure {} loaded with {} diagnostic(s): {}", entry.getSchematicLocation(),
-                structure.getDiagnostics().size(), structure.getDiagnostics());
-        PonderLevel world = new PonderLevel(BlockPos.ORIGIN, null);
-        structure.place(world);
-        world.createBackup();
-        PonderScene scene = compileScene(localization, entry, world);
-        scene.begin();
+        return Collections.unmodifiableList(entries);
+    }
+
+    @Override
+    public List<PonderScene> compile(ResourceLocation id) {
+        List<StoryBoardEntry> matchedEntries = findEntries(id);
+        return matchedEntries.isEmpty() ? Collections.<PonderScene>emptyList() : compile(matchedEntries);
+    }
+
+    @Override
+    public int getSceneCount(ResourceLocation id) {
+        return findEntries(id).size();
+    }
+
+    private List<StoryBoardEntry> findEntries(ResourceLocation id) {
+        if (id == null) {
+            return Collections.emptyList();
+        }
+
+        List<StoryBoardEntry> matchedEntries = new ArrayList<StoryBoardEntry>();
+        Set<StoryBoardEntry> visited = Collections.newSetFromMap(new IdentityHashMap<StoryBoardEntry, Boolean>());
+        addEntries(scenes.get(id), matchedEntries, visited);
+
+        for (Map.Entry<ResourceLocation, PonderComponentMatcher> entry : componentMatchers.entrySet()) {
+            if (!id.equals(entry.getValue().getItemId())) {
+                continue;
+            }
+            addEntries(scenes.get(entry.getKey()), matchedEntries, visited);
+        }
+
+        return matchedEntries;
+    }
+
+    @Override
+    public List<PonderScene> compile(Collection<StoryBoardEntry> entries) {
+        List<PonderScene> compiled = new ArrayList<PonderScene>();
+        for (StoryBoardEntry entry : entries) {
+            compiled.add(compileScene(localization, entry));
+        }
+        return Collections.unmodifiableList(compiled);
+    }
+
+    @Override
+    public ItemStack getDisplayStack(ResourceLocation componentId) {
+        if (componentId == null) {
+            return ItemStack.EMPTY;
+        }
+
+        PonderComponentMatcher matcher = componentMatchers.get(componentId);
+        if (matcher != null) {
+            return matcher.createDisplayStack();
+        }
+
+        for (PonderComponentMatcher candidate : componentMatchers.values()) {
+            if (componentId.equals(candidate.getItemId())) {
+                return candidate.createDisplayStack();
+            }
+        }
+
+        return ItemStack.EMPTY;
+    }
+
+    private static void addEntries(List<StoryBoardEntry> source, List<StoryBoardEntry> target, Set<StoryBoardEntry> visited) {
+        if (source == null || source.isEmpty()) {
+            return;
+        }
+
+        for (StoryBoardEntry entry : source) {
+            if (visited.add(entry)) {
+                target.add(entry);
+            }
+        }
+    }
+
+    public static PonderScene compileScene(PonderLocalization localization, StoryBoardEntry entry) {
+        PonderScene scene = new PonderScene(entry, localization);
+        // Local authoring boards resolve strict workspace assets when compiled, not classpath files.
+        if (!"ponder_authoring".equals(entry.getSchematicLocation().getNamespace())) {
+            scene.setSchematic(PonderSchematic.load(entry.getSchematicLocation()));
+        }
+        scene.program(new PonderSceneBuilder(scene), scene.getSceneBuildingUtil());
         return scene;
-    }
-
-    public synchronized List<StoryBoardEntry> snapshotEntries() {
-        List<StoryBoardEntry> result = new ArrayList<StoryBoardEntry>();
-        for (List<StoryBoardEntry> entries : scenes.values())
-            result.addAll(entries);
-        return Collections.unmodifiableList(result);
-    }
-
-    public static PonderScene compileScene(PonderLocalization localization, StoryBoardEntry entry,
-                                           PonderLevel level) {
-        PonderScene scene = new PonderScene(level, localization, entry.getNamespace(), entry.getComponent(),
-            entry.getTags(), entry.getOrderingEntries());
-        SceneBuildingUtil util;
-        if (level == null) {
-            util = scene.getSceneBuildingUtil();
-        } else {
-            util = new PonderSceneBuildingUtil(level.getBoundsMin(), level.getBoundsMax(),
-                level.getStructureGroups(), entry.getSchematicLocation());
-        }
-        entry.getBoard().program(scene.builder(), util);
-        return scene;
-    }
-
-    public PonderStructure loadSchematic(ResourceLocation location) throws IOException {
-        return loader.load(location);
     }
 }

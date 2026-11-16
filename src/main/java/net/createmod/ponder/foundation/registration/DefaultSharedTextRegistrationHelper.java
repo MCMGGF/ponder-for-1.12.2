@@ -3,7 +3,8 @@ package net.createmod.ponder.foundation.registration;
 import net.createmod.ponder.api.registration.SharedTextRegistrationHelper;
 import net.minecraft.util.ResourceLocation;
 
-public final class DefaultSharedTextRegistrationHelper implements SharedTextRegistrationHelper {
+public class DefaultSharedTextRegistrationHelper implements SharedTextRegistrationHelper {
+
     private final String namespace;
     private final PonderLocalization localization;
 
@@ -12,7 +13,8 @@ public final class DefaultSharedTextRegistrationHelper implements SharedTextRegi
         this.localization = localization;
     }
 
-    @Override public void registerSharedText(String key, String enUs) {
+    @Override
+    public void registerSharedText(String key, String enUs) {
         localization.registerShared(new ResourceLocation(namespace, key), enUs);
     }
 }

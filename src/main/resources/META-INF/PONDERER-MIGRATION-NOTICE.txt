@@ -1,0 +1,25 @@
+Ponder Legacy local authoring migration
+
+The authoring document dialect and selected content creation behavior are
+adapted from the local Ponderer 1.11.0 / Minecraft 1.20.1 source snapshot.
+Copyright (c) 2026 Nobodiiiii. MIT license: licenses/ponderer-MIT.txt.
+The original Ponder Legacy copyright and license remain unchanged.
+
+No modern Ponder, Flywheel, Create, Forge, or Fabric implementation JAR is
+embedded. No Ponderer action_icons atlas or Create-reserved artwork is copied.
+New blueprint/projector models refer to Minecraft's built-in textures; those
+textures are not redistributed. Newly written UI uses text symbols and the
+Minecraft GUI rather than an unlicensed upstream atlas.
+
+Since 0.3.1-beta, the production package no longer includes the 27 legacy
+Thermal GUI screenshots or the four legacy logo/widget/indicator/blank PNGs.
+Thermal previews reference textures supplied by the installed Thermal mod;
+those textures are not copied into this package. Supplemental panels are
+draw-only schematics, not live Thermal menus. Missing dependency textures
+are reported as unavailable. Minecraft and dependency assets retain their
+respective ownership and licenses and do not become MIT under this project.
+Historical recovery archives are evidence, not a cleared public asset pack.
+
+This build targets single-player Cleanroom and supports offline AI import
+only. It does not contain a remote workspace, online AI client, or content
+synchronization.

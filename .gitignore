@@ -1,23 +1,37 @@
-.gradle/
-build/
-run/
-out/
-.idea/
-*.iml
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+
+# idea
+out
 *.ipr
 *.iws
-eclipse/
-*.launch
-logs/
-crash-reports/
-*.log
-*.log.gz
+*.iml
+.idea
+.vscode
 
-# Local Forge/CatServer runtimes and verification evidence.
-verification/*
-!verification/client-harness/
-!verification/client-harness/**
-!verification/server-harness/
-!verification/server-harness/**
-!verification/crafttweaker-fixtures/
-!verification/crafttweaker-fixtures/**
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+crl_ponder/
+temp_*/
+temp_*.log
+hs_err_pid*.log
+*.log
+AGENTS.md
+
+# Local dependencies, runtime state and credentials
+/libs/api/*.jar
+/logs/
+.env
+.env.*
+*.pem
+*.key

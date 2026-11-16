@@ -5,6 +5,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 public interface VectorUtil {
+
     Vec3d centerOf(int x, int y, int z);
 
     Vec3d centerOf(BlockPos pos);

@@ -1,6 +1,6 @@
 {
-  "pack": {
-    "description": "Ponder resources for Minecraft 1.12.2",
-    "pack_format": 3
-  }
+	"pack": {
+		"description": "${mod_name} Resources",
+		"pack_format": 3
+	}
 }

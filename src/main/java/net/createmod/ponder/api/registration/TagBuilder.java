@@ -6,6 +6,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
 public interface TagBuilder {
+
     TagBuilder title(String title);
 
     TagBuilder description(String description);
@@ -18,26 +19,26 @@ public interface TagBuilder {
 
     TagBuilder idAsIcon();
 
-    TagBuilder item(ItemStack item, boolean useAsIcon, boolean useAsMainItem);
+    TagBuilder item(ItemStack stack, boolean useAsIcon, boolean useAsMainItem);
+
+    default TagBuilder item(ItemStack stack) {
+        return item(stack, true, true);
+    }
 
     default TagBuilder item(Item item, boolean useAsIcon, boolean useAsMainItem) {
         return item(new ItemStack(item), useAsIcon, useAsMainItem);
+    }
+
+    default TagBuilder item(Item item) {
+        return item(new ItemStack(item));
     }
 
     default TagBuilder item(Block block, boolean useAsIcon, boolean useAsMainItem) {
         return item(new ItemStack(block), useAsIcon, useAsMainItem);
     }
 
-    default TagBuilder item(Item item) {
-        return item(item, true, true);
-    }
-
     default TagBuilder item(Block block) {
-        return item(block, true, true);
-    }
-
-    default TagBuilder item(ItemStack stack) {
-        return item(stack, true, true);
+        return item(new ItemStack(block));
     }
 
     void register();

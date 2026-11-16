@@ -1,128 +1,146 @@
 package net.createmod.ponder.foundation;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 
-import net.createmod.catnip.outliner.Outline;
-import net.createmod.catnip.outliner.Outliner;
 import net.createmod.ponder.api.scene.Selection;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
-/** Deterministic, finite selection implementation used by the public scene DSL. */
-public final class SelectionImpl implements Selection {
-    private final LinkedHashSet<BlockPos> positions;
-    private Vec3d cachedCenter;
+public final class SelectionImpl {
 
-    private SelectionImpl(LinkedHashSet<BlockPos> positions) {
-        this.positions = positions;
+    private SelectionImpl() {
     }
 
-    public static Selection empty() {
-        return new SelectionImpl(new LinkedHashSet<BlockPos>());
+    public static Selection fromTo(BlockPos first, BlockPos second) {
+        return new BoxSelection(first, second);
     }
 
-    public static Selection of(BlockPos position) {
-        LinkedHashSet<BlockPos> result = new LinkedHashSet<BlockPos>();
-        result.add(position.toImmutable());
-        return new SelectionImpl(result);
-    }
+    private static final class BoxSelection implements Selection {
 
-    public static Selection of(BlockPos first, BlockPos second) {
-        int minX = Math.min(first.getX(), second.getX());
-        int minY = Math.min(first.getY(), second.getY());
-        int minZ = Math.min(first.getZ(), second.getZ());
-        int maxX = Math.max(first.getX(), second.getX());
-        int maxY = Math.max(first.getY(), second.getY());
-        int maxZ = Math.max(first.getZ(), second.getZ());
-        LinkedHashSet<BlockPos> result = new LinkedHashSet<BlockPos>();
-        for (int y = minY; y <= maxY; y++)
-            for (int z = minZ; z <= maxZ; z++)
-                for (int x = minX; x <= maxX; x++)
-                    result.add(new BlockPos(x, y, z));
-        return new SelectionImpl(result);
-    }
+        private final BlockPos min;
+        private final BlockPos max;
+        private final Iterable<BlockPos> iterable;
 
-    public static Selection of(AxisAlignedBB bounds) {
-        return of(new BlockPos(Math.floor(bounds.minX), Math.floor(bounds.minY), Math.floor(bounds.minZ)),
-            new BlockPos(Math.ceil(bounds.maxX) - 1, Math.ceil(bounds.maxY) - 1, Math.ceil(bounds.maxZ) - 1));
-    }
-
-    @Override
-    public boolean test(BlockPos pos) {
-        return pos != null && positions.contains(pos);
-    }
-
-    @Override
-    public Selection add(Selection other) {
-        if (other != null)
-            for (BlockPos pos : other)
-                positions.add(pos.toImmutable());
-        cachedCenter = null;
-        return this;
-    }
-
-    @Override
-    public Selection substract(Selection other) {
-        if (other != null)
-            for (BlockPos pos : other)
-                positions.remove(pos);
-        cachedCenter = null;
-        return this;
-    }
-
-    @Override
-    public Selection copy() {
-        return new SelectionImpl(new LinkedHashSet<BlockPos>(positions));
-    }
-
-    @Override
-    public Vec3d getCenter() {
-        if (cachedCenter != null)
-            return cachedCenter;
-        if (positions.isEmpty())
-            return Vec3d.ZERO;
-        double x = 0;
-        double y = 0;
-        double z = 0;
-        for (BlockPos pos : positions) {
-            x += pos.getX() + .5;
-            y += pos.getY() + .5;
-            z += pos.getZ() + .5;
+        private BoxSelection(BlockPos first, BlockPos second) {
+            this.min = new BlockPos(Math.min(Vec3iAccessor.x(first), Vec3iAccessor.x(second)),
+                Math.min(Vec3iAccessor.y(first), Vec3iAccessor.y(second)),
+                Math.min(Vec3iAccessor.z(first), Vec3iAccessor.z(second)));
+            this.max = new BlockPos(Math.max(Vec3iAccessor.x(first), Vec3iAccessor.x(second)),
+                Math.max(Vec3iAccessor.y(first), Vec3iAccessor.y(second)),
+                Math.max(Vec3iAccessor.z(first), Vec3iAccessor.z(second)));
+            this.iterable = BlockPos.getAllInBox(min, max);
         }
-        cachedCenter = new Vec3d(x / positions.size(), y / positions.size(), z / positions.size());
-        return cachedCenter;
+
+        @Override
+        public boolean test(BlockPos pos) {
+            return Vec3iAccessor.x(pos) >= Vec3iAccessor.x(min) && Vec3iAccessor.x(pos) <= Vec3iAccessor.x(max)
+                && Vec3iAccessor.y(pos) >= Vec3iAccessor.y(min) && Vec3iAccessor.y(pos) <= Vec3iAccessor.y(max)
+                && Vec3iAccessor.z(pos) >= Vec3iAccessor.z(min) && Vec3iAccessor.z(pos) <= Vec3iAccessor.z(max);
+        }
+
+        @Override
+        public Selection add(Selection other) {
+            return new CompoundSelection(this).add(other);
+        }
+
+        @Override
+        public Selection substract(Selection other) {
+            return new CompoundSelection(this).substract(other);
+        }
+
+        @Override
+        public Selection copy() {
+            return new BoxSelection(min, max);
+        }
+
+        @Override
+        public Vec3d getCenter() {
+            return new Vec3d((Vec3iAccessor.x(min) + Vec3iAccessor.x(max) + 1) / 2.0D,
+                (Vec3iAccessor.y(min) + Vec3iAccessor.y(max) + 1) / 2.0D,
+                (Vec3iAccessor.z(min) + Vec3iAccessor.z(max) + 1) / 2.0D);
+        }
+
+        @Override
+        public Iterator<BlockPos> iterator() {
+            return iterable.iterator();
+        }
+
+        @Override
+        public String toString() {
+            if (min.equals(max)) {
+                return "Selection[" + min + "]";
+            }
+            return "Selection[" + min + " -> " + max + "]";
+        }
     }
 
-    @Override
-    public boolean isEmpty() {
-        return positions.isEmpty();
-    }
+    private static final class CompoundSelection implements Selection {
 
-    @Override
-    public int size() {
-        return positions.size();
-    }
+        private final Set<BlockPos> positions;
 
-    @Override
-    public Iterator<BlockPos> iterator() {
-        List<BlockPos> snapshot = new ArrayList<BlockPos>(positions);
-        return Collections.unmodifiableList(snapshot).iterator();
-    }
+        private CompoundSelection(Selection seed) {
+            this.positions = new LinkedHashSet<BlockPos>();
+            add(seed);
+        }
 
-    public Set<BlockPos> asSet() {
-        return Collections.unmodifiableSet(positions);
-    }
+        private CompoundSelection(Set<BlockPos> positions) {
+            this.positions = new LinkedHashSet<BlockPos>(positions);
+        }
 
-    @Override
-    public Outline.OutlineParams makeOutline(Outliner outliner, Object slot) {
-        if (outliner == null)
-            throw new IllegalArgumentException("Outliner is required");
-        return outliner.showCluster(slot, positions);
+        @Override
+        public boolean test(BlockPos pos) {
+            return positions.contains(pos);
+        }
+
+        @Override
+        public Selection add(Selection other) {
+            for (BlockPos pos : other) {
+                positions.add(new BlockPos(pos));
+            }
+            return this;
+        }
+
+        @Override
+        public Selection substract(Selection other) {
+            for (BlockPos pos : other) {
+                positions.remove(pos);
+            }
+            return this;
+        }
+
+        @Override
+        public Selection copy() {
+            return new CompoundSelection(positions);
+        }
+
+        @Override
+        public Vec3d getCenter() {
+            if (positions.isEmpty()) {
+                return Vec3d.ZERO;
+            }
+
+            double totalX = 0.0D;
+            double totalY = 0.0D;
+            double totalZ = 0.0D;
+            for (BlockPos pos : positions) {
+                totalX += Vec3iAccessor.x(pos) + 0.5D;
+                totalY += Vec3iAccessor.y(pos) + 0.5D;
+                totalZ += Vec3iAccessor.z(pos) + 0.5D;
+            }
+            double size = positions.size();
+            return new Vec3d(totalX / size, totalY / size, totalZ / size);
+        }
+
+        @Override
+        public Iterator<BlockPos> iterator() {
+            return positions.iterator();
+        }
+
+        @Override
+        public String toString() {
+            return "Selection[" + positions.size() + " blocks]";
+        }
     }
 }

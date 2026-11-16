@@ -5,6 +5,7 @@ import java.util.function.Function;
 import net.minecraft.util.ResourceLocation;
 
 public interface PonderTagRegistrationHelper<T> {
+
     <S> PonderTagRegistrationHelper<S> withKeyFunction(Function<S, T> keyGen);
 
     TagBuilder registerTag(ResourceLocation location);

@@ -1,86 +1,77 @@
 package net.createmod.ponder.foundation;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
 import net.createmod.ponder.api.scene.PositionUtil;
 import net.createmod.ponder.api.scene.SceneBuildingUtil;
 import net.createmod.ponder.api.scene.Selection;
 import net.createmod.ponder.api.scene.SelectionUtil;
 import net.createmod.ponder.api.scene.VectorUtil;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.Vec3i;
 
-public final class PonderSceneBuildingUtil implements SceneBuildingUtil {
-    private final BlockPos min;
-    private final BlockPos max;
-    private final Map<String, List<BlockPos>> structureGroups;
-    private final ResourceLocation structureId;
-    private final SelectionUtil selection = new SelectionHelper();
-    private final VectorUtil vectors = new VectorHelper();
-    private final PositionUtil positions = new PositionHelper();
+public class PonderSceneBuildingUtil implements SceneBuildingUtil {
 
-    public PonderSceneBuildingUtil(BlockPos min, BlockPos max) {
-        this(min, max, Collections.<String, Collection<BlockPos>>emptyMap());
-    }
+    private static final int DEFAULT_SCENE_HEIGHT = 5;
+    private static final int DEFAULT_SCENE_SPAN = 5;
 
-    public PonderSceneBuildingUtil(BlockPos min, BlockPos max,
-                                   Map<String, ? extends Collection<BlockPos>> structureGroups) {
-        this(min, max, structureGroups, null);
-    }
+    private final PonderScene scene;
+    private final SelectionUtil selectionUtil;
+    private final VectorUtil vectorUtil;
+    private final PositionUtil positionUtil;
 
-    public PonderSceneBuildingUtil(BlockPos min, BlockPos max,
-                                   Map<String, ? extends Collection<BlockPos>> structureGroups,
-                                   ResourceLocation structureId) {
-        this.min = new BlockPos(Math.min(min.getX(), max.getX()), Math.min(min.getY(), max.getY()), Math.min(min.getZ(), max.getZ()));
-        this.max = new BlockPos(Math.max(min.getX(), max.getX()), Math.max(min.getY(), max.getY()), Math.max(min.getZ(), max.getZ()));
-        this.structureGroups = immutableGroups(structureGroups);
-        this.structureId = structureId;
-    }
-
-    public PonderSceneBuildingUtil(BlockPos size) {
-        this(BlockPos.ORIGIN, new BlockPos(Math.max(0, size.getX() - 1), Math.max(0, size.getY() - 1), Math.max(0, size.getZ() - 1)));
+    public PonderSceneBuildingUtil(PonderScene scene) {
+        this.scene = scene;
+        this.selectionUtil = new PonderSelectionUtil();
+        this.vectorUtil = new PonderVectorUtil();
+        this.positionUtil = new PonderPositionUtil();
     }
 
     @Override
     public SelectionUtil select() {
-        return selection;
+        return selectionUtil;
     }
 
     @Override
     public VectorUtil vector() {
-        return vectors;
+        return vectorUtil;
     }
 
     @Override
     public PositionUtil grid() {
-        return positions;
+        return positionUtil;
     }
 
-    private static Map<String, List<BlockPos>> immutableGroups(
-        Map<String, ? extends Collection<BlockPos>> source) {
-        if (source == null || source.isEmpty())
-            return Collections.emptyMap();
-        Map<String, List<BlockPos>> result = new LinkedHashMap<String, List<BlockPos>>();
-        for (Map.Entry<String, ? extends Collection<BlockPos>> entry : source.entrySet()) {
-            List<BlockPos> positions = new ArrayList<BlockPos>();
-            if (entry.getValue() != null)
-                for (BlockPos position : entry.getValue())
-                    if (position != null)
-                        positions.add(position.toImmutable());
-            result.put(entry.getKey(), Collections.unmodifiableList(positions));
+    private BlockPos getSceneMaxPos() {
+        int maxX = Math.max(DEFAULT_SCENE_SPAN - 1, scene.getBasePlateOffsetX() + scene.getBasePlateSize() - 1);
+        int maxY = DEFAULT_SCENE_HEIGHT - 1;
+        int maxZ = Math.max(DEFAULT_SCENE_SPAN - 1, scene.getBasePlateOffsetZ() + scene.getBasePlateSize() - 1);
+        BlockPos schematicSize = scene.getSchematic().getSize();
+        maxX = Math.max(maxX, Vec3iAccessor.x(schematicSize) - 1);
+        maxY = Math.max(maxY, Vec3iAccessor.y(schematicSize) - 1);
+        maxZ = Math.max(maxZ, Vec3iAccessor.z(schematicSize) - 1);
+        for (BlockPos pos : scene.getSchematic().getBlocks().keySet()) {
+            maxX = Math.max(maxX, Vec3iAccessor.x(pos));
+            maxY = Math.max(maxY, Vec3iAccessor.y(pos));
+            maxZ = Math.max(maxZ, Vec3iAccessor.z(pos));
         }
-        return Collections.unmodifiableMap(result);
+        return new BlockPos(maxX, maxY, maxZ);
     }
 
-    private final class PositionHelper implements PositionUtil {
+    private BlockPos getSceneMinPos() {
+        int minX = Math.min(0, scene.getBasePlateOffsetX());
+        int minY = 0;
+        int minZ = Math.min(0, scene.getBasePlateOffsetZ());
+        for (BlockPos pos : scene.getSchematic().getBlocks().keySet()) {
+            minX = Math.min(minX, Vec3iAccessor.x(pos));
+            minY = Math.min(minY, Vec3iAccessor.y(pos));
+            minZ = Math.min(minZ, Vec3iAccessor.z(pos));
+        }
+        return new BlockPos(minX, minY, minZ);
+    }
+
+    private final class PonderPositionUtil implements PositionUtil {
+
         @Override
         public BlockPos at(int x, int y, int z) {
             return new BlockPos(x, y, z);
@@ -92,20 +83,22 @@ public final class PonderSceneBuildingUtil implements SceneBuildingUtil {
         }
     }
 
-    private final class VectorHelper implements VectorUtil {
+    private final class PonderVectorUtil implements VectorUtil {
+
         @Override
         public Vec3d centerOf(int x, int y, int z) {
-            return centerOf(new BlockPos(x, y, z));
+            return centerOf(grid().at(x, y, z));
         }
 
         @Override
         public Vec3d centerOf(BlockPos pos) {
-            return new Vec3d(pos).add(.5, .5, .5);
+            return new Vec3d(Vec3iAccessor.x(pos) + 0.5D, Vec3iAccessor.y(pos) + 0.5D,
+                Vec3iAccessor.z(pos) + 0.5D);
         }
 
         @Override
         public Vec3d topOf(int x, int y, int z) {
-            return topOf(new BlockPos(x, y, z));
+            return blockSurface(grid().at(x, y, z), EnumFacing.UP);
         }
 
         @Override
@@ -115,13 +108,13 @@ public final class PonderSceneBuildingUtil implements SceneBuildingUtil {
 
         @Override
         public Vec3d blockSurface(BlockPos pos, EnumFacing face) {
-            return blockSurface(pos, face, 0);
+            return blockSurface(pos, face, 0.0F);
         }
 
         @Override
         public Vec3d blockSurface(BlockPos pos, EnumFacing face, float margin) {
-            Vec3d normal = new Vec3d(face.getDirectionVec());
-            return centerOf(pos).add(normal.scale(.5 + margin));
+            Vec3d normal = new Vec3d(face.getDirectionVec()).scale(0.5D + margin);
+            return centerOf(pos).add(normal);
         }
 
         @Override
@@ -130,20 +123,21 @@ public final class PonderSceneBuildingUtil implements SceneBuildingUtil {
         }
     }
 
-    private final class SelectionHelper implements SelectionUtil {
+    private final class PonderSelectionUtil implements SelectionUtil {
+
         @Override
         public Selection everywhere() {
-            return SelectionImpl.of(min, max);
+            return SelectionImpl.fromTo(getSceneMinPos(), getSceneMaxPos());
         }
 
         @Override
         public Selection position(int x, int y, int z) {
-            return position(new BlockPos(x, y, z));
+            return position(grid().at(x, y, z));
         }
 
         @Override
         public Selection position(BlockPos pos) {
-            return SelectionImpl.of(pos);
+            return cuboid(pos, Vec3i.NULL_VECTOR);
         }
 
         @Override
@@ -153,12 +147,14 @@ public final class PonderSceneBuildingUtil implements SceneBuildingUtil {
 
         @Override
         public Selection fromTo(BlockPos pos1, BlockPos pos2) {
-            return SelectionImpl.of(pos1, pos2);
+            return SelectionImpl.fromTo(pos1, pos2);
         }
 
         @Override
         public Selection column(int x, int z) {
-            return fromTo(x, min.getY(), z, x, max.getY(), z);
+            int minY = Vec3iAccessor.y(getSceneMinPos());
+            int maxY = Vec3iAccessor.y(getSceneMaxPos());
+            return cuboid(new BlockPos(x, minY, z), new Vec3i(0, maxY - minY, 0));
         }
 
         @Override
@@ -168,37 +164,23 @@ public final class PonderSceneBuildingUtil implements SceneBuildingUtil {
 
         @Override
         public Selection layersFrom(int y) {
-            return fromTo(min.getX(), Math.max(y, min.getY()), min.getZ(), max.getX(), max.getY(), max.getZ());
+            return layers(y, Vec3iAccessor.y(getSceneMaxPos()) - y + 1);
         }
 
         @Override
         public Selection layers(int y, int height) {
-            if (height <= 0)
-                return SelectionImpl.empty();
-            int start = Math.max(y, min.getY());
-            int end = Math.min(max.getY(), y + height - 1);
-            if (end < start)
-                return SelectionImpl.empty();
-            return fromTo(min.getX(), start, min.getZ(), max.getX(), end, max.getZ());
-        }
-
-        @Override
-        public Selection structureGroup(String name) {
-            if (name == null || name.trim().isEmpty())
-                throw new IllegalArgumentException("Structure group name is required");
-            List<BlockPos> positions = structureGroups.get(name);
-            if (positions == null)
-                throw new IllegalArgumentException("Unknown structure group '" + name + "'"
-                    + (structureId == null ? "" : " in " + structureId));
-            Selection result = SelectionImpl.empty();
-            for (BlockPos position : positions)
-                result.add(SelectionImpl.of(position));
-            return result;
+            BlockPos min = getSceneMinPos();
+            BlockPos max = getSceneMaxPos();
+            int clampedY = Math.max(Vec3iAccessor.y(min), Math.min(y, Vec3iAccessor.y(max)));
+            int clampedHeight = Math.max(1, Math.min(height, Vec3iAccessor.y(max) - clampedY + 1));
+            return cuboid(new BlockPos(Vec3iAccessor.x(min), clampedY, Vec3iAccessor.z(min)),
+                new Vec3i(Vec3iAccessor.x(max) - Vec3iAccessor.x(min), clampedHeight - 1,
+                    Vec3iAccessor.z(max) - Vec3iAccessor.z(min)));
         }
 
         @Override
         public Selection cuboid(BlockPos origin, Vec3i size) {
-            return SelectionImpl.of(origin, origin.add(size));
+            return SelectionImpl.fromTo(origin, origin.add(size));
         }
     }
 }

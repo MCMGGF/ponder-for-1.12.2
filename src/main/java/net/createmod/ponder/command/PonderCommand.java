@@ -1,192 +1,274 @@
 package net.createmod.ponder.command;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-import net.createmod.catnip.net.packets.ClientboundSimpleActionPacket;
-import net.createmod.catnip.platform.CatnipServices;
-import net.createmod.ponder.api.diagnostic.PonderDiagnosticView;
-import net.createmod.ponder.api.diagnostic.PonderDiagnostics;
-import net.createmod.ponder.api.diagnostic.PonderSyncDiagnostic;
+import javax.annotation.Nullable;
+
+import net.createmod.ponder.api.registration.SceneRegistryAccess;
 import net.createmod.ponder.foundation.PonderIndex;
-import net.createmod.ponder.foundation.diagnostic.PonderDiagnosticService;
-import net.createmod.ponder.foundation.structure.PonderStructureLoader;
-import net.createmod.ponder.script.ScriptSceneSync;
-import net.createmod.ponder.script.PonderJsonLoader;
+import net.createmod.ponder.foundation.PonderScene;
+import net.createmod.ponder.foundation.PonderScene.RecordedOperation;
+import net.createmod.ponder.foundation.PonderTag;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraftforge.server.command.TextComponentHelper;
 
-/** Forge 1.12 command adapter for opening and reloading Ponder on a client. */
-public final class PonderCommand extends CommandBase {
-    @Override public String getName() { return "ponder"; }
-    @Override public String getUsage(ICommandSender sender) {
-        return "/ponder <index|tags|reload|sync|list|inspect|validate|export|dependencies|namespace:path>";
-    }
-    @Override public int getRequiredPermissionLevel() { return 0; }
+public class PonderCommand extends CommandBase {
+
+    private static final int MAX_DUMP_LINES = 40;
 
     @Override
-    public void execute(MinecraftServer server, ICommandSender sender, String[] arguments) throws CommandException {
-        if (arguments.length > 0 && "sync".equalsIgnoreCase(arguments[0])) {
-            if (!sender.canUseCommand(2, getName())) throw new CommandException("commands.generic.permission");
-            if (arguments.length > 1 && "status".equalsIgnoreCase(arguments[1])) {
-                String playerFilter = arguments.length > 2 ? arguments[2] : "";
-                int count = 0;
-                for (PonderSyncDiagnostic status : PonderDiagnostics.syncStatuses()) {
-                    if (!playerFilter.isEmpty() && !status.getPlayerName().equalsIgnoreCase(playerFilter))
-                        continue;
-                    if (status.getLastResult().isEmpty()) {
-                        send(sender, "ponder.command.sync_status",
-                            status.getPlayerName(), status.getStatus(), status.getTransferId(),
-                            status.getProtocol(), status.getCodecs().size(), status.getCompressedBytes(),
-                            status.getUncompressedBytes(), status.getStartedAt(), status.getUpdatedAt());
-                    } else {
-                        send(sender, "ponder.command.sync_status_result",
-                            status.getPlayerName(), status.getStatus(), status.getTransferId(),
-                            status.getProtocol(), status.getCodecs().size(), status.getCompressedBytes(),
-                            status.getUncompressedBytes(), status.getStartedAt(), status.getUpdatedAt(),
-                            status.getLastResult());
-                    }
-                    if (!status.getCodecDescriptors().isEmpty()
-                        || !status.getRequiredCodecDescriptors().isEmpty())
-                        send(sender, "ponder.command.sync_codecs",
-                            status.getCodecDescriptors(), status.getRequiredCodecDescriptors());
-                    count++;
-                }
-                if (count == 0)
-                    send(sender, "ponder.command.sync_status_empty");
+    public String getName() {
+        return "ponder";
+    }
+
+    @Override
+    public List<String> getAliases() {
+        return Collections.singletonList("ponderdebug");
+    }
+
+    @Override
+    public String getUsage(ICommandSender sender) {
+        return "/ponder <help|list|compile|dump|reload>";
+    }
+
+    @Override
+    public int getRequiredPermissionLevel() {
+        return 0;
+    }
+
+    @Override
+    public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
+        if (args.length == 0 || "help".equals(args[0])) {
+            sendUsage(sender);
+            return;
+        }
+
+        String subCommand = args[0];
+        if ("list".equals(subCommand)) {
+            listRegistryState(sender);
+            return;
+        }
+
+        if (sender.getEntityWorld() == null || !sender.getEntityWorld().isRemote) {
+            sender.sendMessage(new TextComponentString(
+                "\u8be5\u64cd\u4f5c\u4ec5\u5728\u5ba2\u6237\u7aef\u6267\u884c\uff0c\u8bf7\u5728\u6e38\u620f\u5ba2\u6237\u7aef\u8f93\u5165 /ponder\u3002"));
+            return;
+        }
+
+        if ("reload".equals(subCommand)) {
+            long previousGeneration = PonderIndex.getGeneration();
+            PonderIndex.reload();
+            if (PonderIndex.getGeneration() == previousGeneration) {
+                sender.sendMessage(new TextComponentString(
+                    "\u91cd\u8f7d\u5931\u8d25\uff0c\u5df2\u4fdd\u7559\u539f\u7d22\u5f15\uff0c\u8bf7\u68c0\u67e5\u65e5\u5fd7\u3002"));
+            } else {
+                sendSummary(sender, "Reloaded");
+            }
+            return;
+        }
+
+        if ("compile".equals(subCommand)) {
+            if (args.length < 2) {
+                sendUsage(sender);
                 return;
             }
-            ScriptSceneSync.sendAll(server);
-            send(sender, "ponder.command.sync_sent");
+            compileScenes(sender, parseComponentId(args[1]));
             return;
         }
-        if (arguments.length > 0 && isDiagnostic(arguments[0])) {
-            String request = join(arguments);
-            if (sender.getCommandSenderEntity() instanceof EntityPlayerMP) {
-                CatnipServices.NETWORK.sendToClient((EntityPlayerMP) sender.getCommandSenderEntity(),
-                    new ClientboundSimpleActionPacket("ponderDiagnostic", request));
+
+        if ("dump".equals(subCommand)) {
+            if (args.length < 2) {
+                sendUsage(sender);
                 return;
             }
-            if (("validate".equalsIgnoreCase(arguments[0]) || "export".equalsIgnoreCase(arguments[0]))
-                && !sender.canUseCommand(2, getName()))
-                throw new CommandException("commands.generic.permission");
-            try {
-                PonderDiagnosticService.execute("server", request,
-                    message -> sender.sendMessage(new TextComponentString(message)));
-            } catch (RuntimeException failure) {
-                throw new CommandException(failure.getMessage());
-            }
+
+            ResourceLocation componentId = parseComponentId(args[1]);
+            int sceneIndex = args.length >= 3 ? parseInt(args[2], 0) : 0;
+            dumpScene(sender, componentId, sceneIndex);
             return;
         }
-        if (arguments.length > 0 && "reload".equalsIgnoreCase(arguments[0])) {
-            if (!sender.canUseCommand(2, getName())) throw new CommandException("commands.generic.permission");
-            PonderStructureLoader.invalidateCaches();
-            PonderJsonLoader.ReloadResult result = PonderJsonLoader.reload();
-            CatnipServices.NETWORK.sendToAllClients(new ClientboundSimpleActionPacket("reloadPonder", ""));
-            ScriptSceneSync.sendAll(server);
-            send(sender, "ponder.command.reload_complete");
-            sender.sendMessage(new TextComponentString("Ponder JSON: " + result.packs + " pack(s), "
-                + result.scenes + " scene(s), " + result.warnings + " warning(s), "
-                + result.errors + " error(s)"));
-            return;
-        }
-        if (!(sender.getCommandSenderEntity() instanceof EntityPlayerMP))
-            throw new CommandException("ponder.command.player_only");
-        EntityPlayerMP player = (EntityPlayerMP) sender.getCommandSenderEntity();
-        String value = arguments.length == 0 ? "ponder:tags" : arguments[0];
-        if ("index".equalsIgnoreCase(value)) value = "ponder:index";
-        if ("tags".equalsIgnoreCase(value)) value = "ponder:tags";
-        if (!"ponder:index".equals(value) && !"ponder:tags".equals(value)) {
-            ResourceLocation id;
-            try { id = new ResourceLocation(value); }
-            catch (RuntimeException malformed) { throw new CommandException("ponder.command.invalid_id", value); }
-            if (!PonderIndex.getSceneAccess().doScenesExistForId(id))
-                throw new CommandException("ponder.command.unknown_scene", value);
-        }
-        CatnipServices.NETWORK.sendToClient(player, new ClientboundSimpleActionPacket("openPonder", value));
+
+        sendUsage(sender);
     }
 
     @Override
     public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args,
-                                          BlockPos targetPos) {
+        @Nullable BlockPos targetPos) {
         if (args.length == 1) {
-            java.util.ArrayList<String> options = new java.util.ArrayList<String>();
-            options.add("index"); options.add("tags"); options.add("list"); options.add("inspect");
-            options.add("validate"); options.add("export"); options.add("dependencies");
-            if (sender.canUseCommand(2, getName())) { options.add("reload"); options.add("sync"); }
-            PonderIndex.getSceneAccess().getRegisteredEntries()
-                .forEach(entry -> options.add(entry.getKey().toString()));
-            return getListOfStringsMatchingLastWord(args, options);
+            return getListOfStringsMatchingLastWord(args, "help", "list", "compile", "dump", "reload");
         }
-        if (args.length == 2 && ("list".equalsIgnoreCase(args[0])
-            || "validate".equalsIgnoreCase(args[0])
-            || "dependencies".equalsIgnoreCase(args[0])))
-            return getListOfStringsMatchingLastWord(args, "local", "server", "effective");
-        if (args.length == 2 && ("inspect".equalsIgnoreCase(args[0])
-            || "export".equalsIgnoreCase(args[0])))
-            return getListOfStringsMatchingLastWord(args,
-                PonderDiagnosticService.sceneIds(PonderDiagnosticView.EFFECTIVE));
-        if (args.length == 3 && "inspect".equalsIgnoreCase(args[0]))
-            return getListOfStringsMatchingLastWord(args, "local", "server", "effective");
-        if (args.length == 3 && "export".equalsIgnoreCase(args[0]))
-            return getListOfStringsMatchingLastWord(args, "ir", "timeline", "all");
-        if (args.length == 4 && "export".equalsIgnoreCase(args[0]))
-            return getListOfStringsMatchingLastWord(args, "local", "server", "effective");
-        if (args.length == 2 && "sync".equalsIgnoreCase(args[0]))
-            return getListOfStringsMatchingLastWord(args, "status");
-        if (args.length == 3 && "sync".equalsIgnoreCase(args[0])
-            && "status".equalsIgnoreCase(args[1]))
-            return getListOfStringsMatchingLastWord(args, server.getOnlinePlayerNames());
+
+        if (args.length == 2 && ("compile".equals(args[0]) || "dump".equals(args[0]))) {
+            return getListOfStringsMatchingLastWord(args, getRegisteredComponentStrings());
+        }
+
+        if (args.length == 3 && "dump".equals(args[0])) {
+            return getListOfStringsMatchingLastWord(args, getSceneIndexes(parseComponentId(args[1])));
+        }
+
         return Collections.emptyList();
     }
 
-    private static boolean isDiagnostic(String command) {
-        return "list".equalsIgnoreCase(command) || "inspect".equalsIgnoreCase(command)
-            || "validate".equalsIgnoreCase(command) || "export".equalsIgnoreCase(command)
-            || "dependencies".equalsIgnoreCase(command);
+    private void sendUsage(ICommandSender sender) {
+        sender.sendMessage(new TextComponentString("Ponder debug commands:"));
+        sender.sendMessage(new TextComponentString("/ponder list"));
+        sender.sendMessage(new TextComponentString("/ponder reload"));
+        sender.sendMessage(new TextComponentString("/ponder compile <component_id>"));
+        sender.sendMessage(new TextComponentString("/ponder dump <component_id> [scene_index]"));
     }
 
-    private static String join(String[] arguments) {
-        StringBuilder result = new StringBuilder();
-        for (String argument : arguments) {
-            if (result.length() > 0)
-                result.append(' ');
-            result.append(argument);
-        }
-        return result.toString();
-    }
+    private void listRegistryState(ICommandSender sender) {
+        sendSummary(sender, "Registry");
 
-    private static void send(ICommandSender sender, String key, Object... arguments) {
-        if (sender.getCommandSenderEntity() instanceof EntityPlayerMP) {
-            sender.sendMessage(TextComponentHelper.createComponentTranslation(sender, key, arguments));
+        Map<ResourceLocation, Integer> counts = countScenesByComponent();
+        if (counts.isEmpty()) {
+            sender.sendMessage(new TextComponentString("No Ponder scenes are registered."));
             return;
         }
-        sender.sendMessage(new TextComponentString(english(key, arguments)));
+
+        for (Map.Entry<ResourceLocation, Integer> entry : counts.entrySet()) {
+            int tagCount = PonderIndex.getTagAccess().getTags(entry.getKey()).size();
+            sender.sendMessage(new TextComponentString(entry.getKey() + " -> " + entry.getValue()
+                + " storyboard(s), " + tagCount + " tag(s)"));
+        }
     }
 
-    private static String english(String key, Object[] arguments) {
-        String message;
-        if ("ponder.command.sync_status".equals(key))
-            message = "%1$s: status=%2$s transfer=%3$s protocol=%4$s codecs=%5$s compressed=%6$s uncompressed=%7$s started=%8$s updated=%9$s";
-        else if ("ponder.command.sync_status_result".equals(key))
-            message = "%1$s: status=%2$s transfer=%3$s protocol=%4$s codecs=%5$s compressed=%6$s uncompressed=%7$s started=%8$s updated=%9$s result=%10$s";
-        else if ("ponder.command.sync_status_empty".equals(key))
-            message = "No matching Ponder sync status is available.";
-        else if ("ponder.command.sync_sent".equals(key))
-            message = "Ponder scene snapshot sent to all online clients.";
-        else if ("ponder.command.sync_codecs".equals(key))
-            message = "Client codecs: %1$s; snapshot requirements: %2$s";
-        else if ("ponder.command.reload_complete".equals(key))
-            message = "Ponder reapplied compiled scenes and refreshed structures. ZenScript changes require a restart.";
-        else
-            return key;
-        return arguments.length == 0 ? message : String.format(java.util.Locale.ROOT, message, arguments);
+    private void compileScenes(ICommandSender sender, ResourceLocation componentId) {
+        List<PonderScene> scenes = PonderIndex.getSceneAccess().compile(componentId);
+        if (scenes.isEmpty()) {
+            sender.sendMessage(new TextComponentString("No storyboard entries found for " + componentId));
+            return;
+        }
+
+        sender.sendMessage(new TextComponentString(
+            "Compiled " + scenes.size() + " scene(s) for " + componentId + ":"));
+        for (int i = 0; i < scenes.size(); i++) {
+            sender.sendMessage(new TextComponentString(describeScene(i, scenes.get(i))));
+        }
+    }
+
+    private void dumpScene(ICommandSender sender, ResourceLocation componentId, int sceneIndex) throws CommandException {
+        List<PonderScene> scenes = PonderIndex.getSceneAccess().compile(componentId);
+        if (scenes.isEmpty()) {
+            sender.sendMessage(new TextComponentString("No storyboard entries found for " + componentId));
+            return;
+        }
+
+        if (sceneIndex < 0 || sceneIndex >= scenes.size()) {
+            throw new CommandException("Scene index out of bounds for " + componentId + ": " + sceneIndex);
+        }
+
+        PonderScene scene = scenes.get(sceneIndex);
+        sender.sendMessage(new TextComponentString(describeScene(sceneIndex, scene)));
+
+        List<RecordedOperation> operations = scene.getRecordedOperations();
+        if (operations.isEmpty()) {
+            sender.sendMessage(new TextComponentString("This scene did not record any operations."));
+            return;
+        }
+
+        int lines = Math.min(MAX_DUMP_LINES, operations.size());
+        for (int i = 0; i < lines; i++) {
+            RecordedOperation operation = operations.get(i);
+            sender.sendMessage(
+                new TextComponentString("[" + i + " @ " + operation.getTick() + "t] " + operation.getDescription()));
+        }
+
+        if (operations.size() > lines) {
+            sender.sendMessage(new TextComponentString(
+                "... truncated " + (operations.size() - lines) + " additional operation(s)"));
+        }
+    }
+
+    private void sendSummary(ICommandSender sender, String prefix) {
+        int sceneEntries = PonderIndex.getSceneAccess().getRegisteredEntries().size();
+        int componentCount = countScenesByComponent().size();
+        int listedTags = PonderIndex.getTagAccess().getListedTags().size();
+        sender.sendMessage(new TextComponentString(prefix + " Ponder state: " + PonderIndex.getPluginCount()
+            + " plugin(s), " + sceneEntries + " storyboard entry(ies), " + componentCount + " component(s), "
+            + listedTags + " listed tag(s)"));
+    }
+
+    private Map<ResourceLocation, Integer> countScenesByComponent() {
+        Map<ResourceLocation, Integer> counts = new LinkedHashMap<ResourceLocation, Integer>();
+        for (Map.Entry<ResourceLocation, net.createmod.ponder.api.registration.StoryBoardEntry> entry : PonderIndex
+            .getSceneAccess()
+            .getRegisteredEntries()) {
+            Integer existing = counts.get(entry.getKey());
+            counts.put(entry.getKey(), Integer.valueOf(existing == null ? 1 : existing.intValue() + 1));
+        }
+        return counts;
+    }
+
+    private Collection<String> getRegisteredComponentStrings() {
+        List<String> ids = new ArrayList<String>();
+        for (ResourceLocation componentId : countScenesByComponent().keySet()) {
+            ids.add(componentId.toString());
+        }
+        return ids;
+    }
+
+    private Collection<String> getSceneIndexes(ResourceLocation componentId) {
+        int sceneCount = getSceneAccess().getSceneCount(componentId);
+        List<String> indexes = new ArrayList<String>();
+        for (int i = 0; i < sceneCount; i++) {
+            indexes.add(Integer.toString(i));
+        }
+        return indexes;
+    }
+
+    SceneRegistryAccess getSceneAccess() {
+        return PonderIndex.getSceneAccess();
+    }
+
+    private String describeScene(int sceneIndex, PonderScene scene) {
+        StringBuilder builder = new StringBuilder();
+        builder.append('#')
+            .append(sceneIndex)
+            .append(" sceneId=")
+            .append(scene.getSceneId())
+            .append(", title=\"")
+            .append(scene.getTitle())
+            .append("\", schematic=")
+            .append(scene.getSchematicLocation())
+            .append(", tags=")
+            .append(formatTags(scene.getTags()))
+            .append(", ops=")
+            .append(scene.getOperationLog().size())
+            .append(", idleTicks=")
+            .append(scene.getTotalIdleTicks())
+            .append(", finished=")
+            .append(scene.isFinished());
+        return builder.toString();
+    }
+
+    private String formatTags(List<ResourceLocation> tags) {
+        if (tags.isEmpty()) {
+            return "[]";
+        }
+
+        StringBuilder builder = new StringBuilder("[");
+        for (int i = 0; i < tags.size(); i++) {
+            if (i > 0) {
+                builder.append(", ");
+            }
+            builder.append(tags.get(i));
+        }
+        builder.append(']');
+        return builder.toString();
+    }
+
+    private ResourceLocation parseComponentId(String rawId) {
+        return new ResourceLocation(rawId);
     }
 }

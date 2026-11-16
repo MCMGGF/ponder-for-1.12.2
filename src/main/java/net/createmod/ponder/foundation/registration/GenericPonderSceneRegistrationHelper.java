@@ -9,37 +9,46 @@ import net.createmod.ponder.api.registration.StoryBoardEntry;
 import net.createmod.ponder.api.scene.PonderStoryBoard;
 import net.minecraft.util.ResourceLocation;
 
-public final class GenericPonderSceneRegistrationHelper<T> implements PonderSceneRegistrationHelper<T> {
-    private final PonderSceneRegistrationHelper<ResourceLocation> delegate;
-    private final Function<T, ResourceLocation> keyFunction;
+public class GenericPonderSceneRegistrationHelper<T> implements PonderSceneRegistrationHelper<T> {
 
-    public GenericPonderSceneRegistrationHelper(PonderSceneRegistrationHelper<ResourceLocation> delegate,
-                                                Function<T, ResourceLocation> keyFunction) {
-        this.delegate = delegate;
-        this.keyFunction = keyFunction;
+    private final PonderSceneRegistrationHelper<ResourceLocation> helperDelegate;
+    private final Function<T, ResourceLocation> keyGen;
+
+    public GenericPonderSceneRegistrationHelper(PonderSceneRegistrationHelper<ResourceLocation> helperDelegate,
+        Function<T, ResourceLocation> keyGen) {
+        this.helperDelegate = helperDelegate;
+        this.keyGen = keyGen;
     }
 
-    @Override public <S> PonderSceneRegistrationHelper<S> withKeyFunction(final Function<S, T> function) {
-        return new GenericPonderSceneRegistrationHelper<S>(delegate, function.andThen(keyFunction));
+    @Override
+    public <S> PonderSceneRegistrationHelper<S> withKeyFunction(Function<S, T> nextKeyGen) {
+        return new GenericPonderSceneRegistrationHelper<S>(helperDelegate, nextKeyGen.andThen(this.keyGen));
     }
 
-    @Override public StoryBoardEntry addStoryBoard(T component, ResourceLocation schematicLocation,
-                                                    PonderStoryBoard storyBoard, ResourceLocation... tags) {
-        return delegate.addStoryBoard(keyFunction.apply(component), schematicLocation, storyBoard, tags);
+    @Override
+    public StoryBoardEntry addStoryBoard(T component, ResourceLocation schematicLocation, PonderStoryBoard storyBoard,
+        ResourceLocation... tags) {
+        return helperDelegate.addStoryBoard(keyGen.apply(component), schematicLocation, storyBoard, tags);
     }
 
-    @Override public StoryBoardEntry addStoryBoard(T component, String schematicPath,
-                                                    PonderStoryBoard storyBoard, ResourceLocation... tags) {
-        return delegate.addStoryBoard(keyFunction.apply(component), schematicPath, storyBoard, tags);
+    @Override
+    public StoryBoardEntry addStoryBoard(T component, String schematicPath, PonderStoryBoard storyBoard,
+        ResourceLocation... tags) {
+        return helperDelegate.addStoryBoard(keyGen.apply(component), schematicPath, storyBoard, tags);
     }
 
-    @Override public MultiSceneBuilder forComponents(T... components) {
+    @Override
+    public MultiSceneBuilder forComponents(T... components) {
         return new GenericMultiSceneBuilder<T>(this, Arrays.asList(components));
     }
 
-    @Override public MultiSceneBuilder forComponents(Iterable<? extends T> components) {
+    @Override
+    public MultiSceneBuilder forComponents(Iterable<? extends T> components) {
         return new GenericMultiSceneBuilder<T>(this, components);
     }
 
-    @Override public ResourceLocation asLocation(String path) { return delegate.asLocation(path); }
+    @Override
+    public ResourceLocation asLocation(String path) {
+        return helperDelegate.asLocation(path);
+    }
 }

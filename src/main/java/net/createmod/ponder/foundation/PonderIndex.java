@@ -3,189 +3,204 @@ package net.createmod.ponder.foundation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
-import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 import net.createmod.ponder.Ponder;
+import net.createmod.ponder.PonderBackportMod;
 import net.createmod.ponder.api.registration.LangRegistryAccess;
 import net.createmod.ponder.api.registration.PonderPlugin;
 import net.createmod.ponder.api.registration.SceneRegistryAccess;
 import net.createmod.ponder.api.registration.TagRegistryAccess;
-import net.createmod.ponder.api.diagnostic.PonderDiagnosticSnapshot;
-import net.createmod.ponder.api.diagnostic.PonderDiagnosticView;
-import net.createmod.ponder.api.diagnostic.PonderDiagnosticContributors;
-import net.createmod.ponder.api.diagnostic.PonderStructureDependency;
-import net.createmod.ponder.api.diagnostic.PonderSyncDiagnostic;
-import net.createmod.ponder.enums.PonderConfig;
-import net.createmod.ponder.foundation.content.BasePonderPlugin;
 import net.createmod.ponder.foundation.registration.DefaultPonderSceneRegistrationHelper;
 import net.createmod.ponder.foundation.registration.DefaultPonderTagRegistrationHelper;
+import net.createmod.ponder.foundation.registration.PonderComponentMatcher;
 import net.createmod.ponder.foundation.registration.DefaultSharedTextRegistrationHelper;
-import net.createmod.ponder.foundation.registration.PonderIndexExclusionHelper;
 import net.createmod.ponder.foundation.registration.PonderLocalization;
 import net.createmod.ponder.foundation.registration.PonderSceneRegistry;
 import net.createmod.ponder.foundation.registration.PonderTagRegistry;
-import net.createmod.ponder.foundation.diagnostic.PonderDiagnosticRegistry;
-import net.createmod.ponder.command.PonderCommands;
-import net.createmod.ponder.script.ScriptPonderPlugin;
-import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
+import net.minecraft.util.ResourceLocation;
 
 public final class PonderIndex {
-    private static final List<PonderPlugin> PLUGINS = new ArrayList<PonderPlugin>();
-    private static final Set<String> PLUGIN_CLASSES = new HashSet<String>();
-    private static volatile RegistrationState state = RegistrationState.empty();
-    private static volatile PonderLocalization.TranslationProvider translationProvider;
-    private static boolean discovered;
-    private static boolean frozen;
 
-    private static final Comparator<PonderPlugin> PLUGIN_ORDER = new Comparator<PonderPlugin>() {
-        @Override public int compare(PonderPlugin left, PonderPlugin right) {
-            int base = Boolean.compare(!Ponder.CONTENT_NAMESPACE.equals(left.getModId()),
-                !Ponder.CONTENT_NAMESPACE.equals(right.getModId()));
-            if (base != 0) return base;
-            int mod = left.getModId().compareTo(right.getModId());
-            return mod != 0 ? mod : left.getClass().getName().compareTo(right.getClass().getName());
+    private static volatile Registries active = new Registries();
+    private static final ThreadLocal<Registries> BUILDING = new ThreadLocal<Registries>();
+    private static volatile long generation;
+    private static boolean reloading;
+    private static final List<PonderPlugin> PLUGINS = new ArrayList<PonderPlugin>();
+    private static final Comparator<PonderPlugin> PLUGIN_COMPARATOR = new Comparator<PonderPlugin>() {
+        @Override
+        public int compare(PonderPlugin left, PonderPlugin right) {
+            boolean leftIsPonder = Ponder.MOD_ID.equals(left.getModId());
+            boolean rightIsPonder = Ponder.MOD_ID.equals(right.getModId());
+            if (leftIsPonder != rightIsPonder) {
+                return leftIsPonder ? -1 : 1;
+            }
+            return left.getModId().compareTo(right.getModId());
         }
     };
-
-    static {
-        addPlugin(new BasePonderPlugin());
-        addPlugin(new ScriptPonderPlugin());
-    }
 
     private PonderIndex() {
     }
 
-    public static synchronized void addPlugin(PonderPlugin plugin) {
-        if (plugin == null) throw new IllegalArgumentException("Ponder plugin may not be null");
-        if (frozen) throw new IllegalStateException("Ponder plugin discovery is complete");
-        if (plugin.getModId() == null || plugin.getModId().trim().isEmpty())
-            throw new IllegalArgumentException("Ponder plugin returned a blank mod id: " + plugin.getClass().getName());
-        if (!PLUGIN_CLASSES.add(plugin.getClass().getName())) return;
-        PLUGINS.add(plugin);
-        Collections.sort(PLUGINS, PLUGIN_ORDER);
-    }
-
-    public static synchronized void discoverPlugins() {
-        if (discovered) return;
-        discovered = true;
-        try {
-            for (PonderPlugin plugin : ServiceLoader.load(PonderPlugin.class, PonderIndex.class.getClassLoader()))
-                addPlugin(plugin);
-        } catch (ServiceConfigurationError error) {
-            Ponder.LOGGER.error("A Ponder ServiceLoader plugin could not be created", error);
-        }
-        try {
-            PonderDiagnosticContributors.discover();
-        } catch (RuntimeException error) {
-            Ponder.LOGGER.error("A Ponder diagnostic contributor could not be discovered", error);
+    public static void addPlugin(PonderPlugin plugin) {
+        synchronized (PLUGINS) {
+            int index = Collections.binarySearch(PLUGINS, plugin, PLUGIN_COMPARATOR);
+            int insertionPoint = index >= 0 ? index : -index - 1;
+            PLUGINS.add(insertionPoint, plugin);
         }
     }
 
-    public static synchronized void registerAll() {
-        RegistrationState replacement = buildState();
-        state = replacement;
-        frozen = true;
-        try {
-            PonderDiagnosticRegistry.rebuild(replacement.scenes);
-        } catch (RuntimeException failure) {
-            Ponder.LOGGER.error("Could not rebuild Ponder diagnostics; registration remains active", failure);
+    public static void forEachPlugin(Consumer<PonderPlugin> action) {
+        for (PonderPlugin plugin : plugins()) {
+            action.accept(plugin);
         }
-        Ponder.LOGGER.info("Registered {} Ponder plugin(s) and {} storyboard(s)", PLUGINS.size(),
-            replacement.scenes.getRegisteredEntries().size());
     }
 
-    public static synchronized void gatherSharedText() {
-        registerAll();
+    private static List<PonderPlugin> plugins() {
+        synchronized (PLUGINS) {
+            return new ArrayList<PonderPlugin>(PLUGINS);
+        }
     }
 
     public static synchronized void reload() {
-        registerAll();
-    }
-
-    private static RegistrationState buildState() {
-        PonderLocalization localization = new PonderLocalization();
-        localization.setTranslationProvider(translationProvider);
-        PonderSceneRegistry scenes = new PonderSceneRegistry(localization);
-        PonderTagRegistry tags = new PonderTagRegistry();
-        PonderIndexExclusionHelper exclusions = new PonderIndexExclusionHelper();
-
-        for (PonderPlugin plugin : PLUGINS)
-            plugin.registerScenes(new DefaultPonderSceneRegistrationHelper(plugin.getModId(),
-                plugin.getClass().getName(), scenes));
-        for (PonderPlugin plugin : PLUGINS)
-            plugin.registerTags(new DefaultPonderTagRegistrationHelper(plugin.getModId(), tags, localization));
-        for (PonderPlugin plugin : PLUGINS)
-            plugin.registerSharedText(new DefaultSharedTextRegistrationHelper(plugin.getModId(), localization));
-        for (PonderPlugin plugin : PLUGINS)
-            plugin.indexExclusions(exclusions);
-
-        scenes.freeze();
-        tags.freeze();
-        return new RegistrationState(localization, scenes, tags, exclusions);
-    }
-
-    public static void forEachPlugin(Consumer<PonderPlugin> consumer) {
-        for (PonderPlugin plugin : pluginSnapshot()) consumer.accept(plugin);
-    }
-
-    public static Stream<PonderPlugin> streamPlugins() {
-        return pluginSnapshot().stream();
-    }
-
-    private static synchronized List<PonderPlugin> pluginSnapshot() {
-        return new ArrayList<PonderPlugin>(PLUGINS);
-    }
-
-    public static SceneRegistryAccess getSceneAccess() { return state.scenes; }
-    public static TagRegistryAccess getTagAccess() { return state.tags; }
-    public static LangRegistryAccess getLangAccess() { return state.localization; }
-    public static void setTranslationProvider(PonderLocalization.TranslationProvider provider) {
-        translationProvider = provider;
-        state.localization.setTranslationProvider(provider);
-    }
-    public static PonderIndexExclusionHelper getIndexExclusions() { return state.exclusions; }
-    public static PonderDiagnosticSnapshot getDiagnosticSnapshot(PonderDiagnosticView view) {
-        return PonderDiagnosticRegistry.snapshot(view);
-    }
-    public static List<PonderSyncDiagnostic> getSyncDiagnostics() {
-        return net.createmod.ponder.script.ScriptSceneSync.snapshotDiagnostics();
-    }
-    public static List<PonderStructureDependency> getStructureDependencies(PonderDiagnosticView view) {
-        return PonderDiagnosticRegistry.structureDependencies(view);
-    }
-    public static boolean editingModeActive() { return PonderConfig.client().isEditingMode(); }
-
-    public static void registerCommands(FMLServerStartingEvent event) {
-        PonderCommands.register(event);
-    }
-
-    private static final class RegistrationState {
-        final PonderLocalization localization;
-        final PonderSceneRegistry scenes;
-        final PonderTagRegistry tags;
-        final PonderIndexExclusionHelper exclusions;
-
-        RegistrationState(PonderLocalization localization, PonderSceneRegistry scenes,
-                          PonderTagRegistry tags, PonderIndexExclusionHelper exclusions) {
-            this.localization = localization;
-            this.scenes = scenes;
-            this.tags = tags;
-            this.exclusions = exclusions;
+        if (reloading) {
+            throw new IllegalStateException("A Ponder plugin attempted a recursive registry reload");
         }
-
-        static RegistrationState empty() {
-            PonderLocalization localization = new PonderLocalization();
-            PonderSceneRegistry scenes = new PonderSceneRegistry(localization);
-            PonderTagRegistry tags = new PonderTagRegistry();
-            scenes.freeze();
-            tags.freeze();
-            return new RegistrationState(localization, scenes, tags, new PonderIndexExclusionHelper());
+        long started = System.nanoTime();
+        Ponder.LOGGER.info("Reloading Ponder plugin registry");
+        Registries next = new Registries();
+        List<PonderPlugin> participants = plugins();
+        List<PonderPlugin> startedPlugins = new ArrayList<PonderPlugin>();
+        boolean successful = false;
+        Throwable pendingFailure = null;
+        reloading = true;
+        try {
+            BUILDING.set(next);
+            for (PonderPlugin plugin : participants) {
+                startedPlugins.add(plugin);
+                plugin.onPonderReloadStart();
+            }
+            registerAll(participants);
+            gatherSharedText(participants);
+            // Readers retain the previous complete index until registration succeeds.
+            active = next;
+            generation++;
+            successful = true;
+            Ponder.LOGGER.info("Ponder registry generation {} contains {} scene entries and {} listed tags ({} ms)",
+                Long.valueOf(generation), Integer.valueOf(next.scenes.getRegisteredEntryCount()),
+                Integer.valueOf(next.tags.getListedTagCount()),
+                Long.valueOf((System.nanoTime() - started) / 1000000L));
+        } catch (RuntimeException | LinkageError failure) {
+            Ponder.LOGGER.error("Ponder registry reload failed; retaining the previous complete index", failure);
+        } catch (Error failure) {
+            // Attempt every rollback before propagating a serious failure.
+            pendingFailure = failure;
+        } finally {
+            BUILDING.remove();
+            try {
+                for (int i = startedPlugins.size() - 1; i >= 0; i--) {
+                    PonderPlugin plugin = startedPlugins.get(i);
+                    try {
+                        plugin.onPonderReloadEnd(successful);
+                    } catch (RuntimeException | LinkageError failure) {
+                        if (pendingFailure != null) {
+                            pendingFailure = retainFailure(pendingFailure, failure);
+                        }
+                        Ponder.LOGGER.error("Ponder plugin {} failed to finish its reload",
+                            plugin.getClass().getName(), failure);
+                    } catch (Error failure) {
+                        pendingFailure = retainFailure(pendingFailure, failure);
+                    }
+                }
+                // A failed plugin may still have changed optional resource registries.
+                if (PonderBackportMod.proxy != null) {
+                    try {
+                        PonderBackportMod.proxy.onPonderReload();
+                    } catch (RuntimeException | Error failure) {
+                        pendingFailure = retainFailure(pendingFailure, failure);
+                    }
+                }
+            } finally {
+                reloading = false;
+            }
         }
+        if (pendingFailure instanceof Error) {
+            throw (Error) pendingFailure;
+        }
+        if (pendingFailure != null) {
+            throw (RuntimeException) pendingFailure;
+        }
+    }
+
+    private static Throwable retainFailure(Throwable original, Throwable failure) {
+        if (original == null) {
+            return failure;
+        }
+        if (original != failure) {
+            original.addSuppressed(failure);
+        }
+        return original;
+    }
+
+    public static void registerAll() {
+        registerAll(plugins());
+    }
+
+    private static void registerAll(List<PonderPlugin> plugins) {
+        for (PonderPlugin plugin : plugins) {
+            Registries registries = registries();
+            plugin.registerScenes(new DefaultPonderSceneRegistrationHelper(plugin.getModId(), registries.scenes));
+            plugin.registerTags(new DefaultPonderTagRegistrationHelper(plugin.getModId(), registries.tags,
+                registries.localization));
+        }
+    }
+
+    public static void gatherSharedText() {
+        gatherSharedText(plugins());
+    }
+
+    private static void gatherSharedText(List<PonderPlugin> plugins) {
+        for (PonderPlugin plugin : plugins) {
+            plugin.registerSharedText(new DefaultSharedTextRegistrationHelper(plugin.getModId(),
+                registries().localization));
+        }
+    }
+
+    public static SceneRegistryAccess getSceneAccess() {
+        return registries().scenes;
+    }
+
+    public static void registerComponentMatcher(ResourceLocation componentId, PonderComponentMatcher matcher) {
+        registries().scenes.registerComponentMatcher(componentId, matcher);
+    }
+
+    public static TagRegistryAccess getTagAccess() {
+        return registries().tags;
+    }
+
+    public static LangRegistryAccess getLangAccess() {
+        return registries().localization;
+    }
+
+    public static int getPluginCount() {
+        synchronized (PLUGINS) {
+            return PLUGINS.size();
+        }
+    }
+
+    public static long getGeneration() {
+        return generation;
+    }
+
+    private static Registries registries() {
+        Registries building = BUILDING.get();
+        return building == null ? active : building;
+    }
+
+    private static final class Registries {
+        private final PonderLocalization localization = new PonderLocalization();
+        private final PonderSceneRegistry scenes = new PonderSceneRegistry(localization);
+        private final PonderTagRegistry tags = new PonderTagRegistry(localization);
     }
 }

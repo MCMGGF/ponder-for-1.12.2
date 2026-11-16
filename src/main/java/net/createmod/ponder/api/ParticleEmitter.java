@@ -1,8 +1,9 @@
 package net.createmod.ponder.api;
 
-import net.createmod.ponder.foundation.PonderWorld;
+import net.createmod.ponder.api.level.PonderLevel;
 
 @FunctionalInterface
 public interface ParticleEmitter {
-    void create(PonderWorld world, double x, double y, double z);
+
+    void create(PonderLevel world, double x, double y, double z);
 }

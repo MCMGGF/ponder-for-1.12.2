@@ -4,14 +4,10 @@ import java.util.function.Consumer;
 
 import net.createmod.ponder.foundation.PonderScene;
 
-/** A resettable timeline action. One instance may be replayed and restored repeatedly. */
 public abstract class PonderInstruction {
+
     public boolean isBlocking() {
         return false;
-    }
-
-    public int getDuration() {
-        return 0;
     }
 
     public void reset(PonderScene scene) {
@@ -24,14 +20,34 @@ public abstract class PonderInstruction {
 
     public abstract void tick(PonderScene scene);
 
-    public Object captureState() {
-        return null;
-    }
-
-    public void restoreState(Object state) {
-    }
-
     public static PonderInstruction simple(Consumer<PonderScene> callback) {
-        return new CallbackInstruction(callback);
+        return new Simple(callback);
+    }
+
+    private static class Simple extends PonderInstruction {
+
+        private final Consumer<PonderScene> callback;
+
+        private boolean executed;
+
+        private Simple(Consumer<PonderScene> callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public boolean isComplete() {
+            return executed;
+        }
+
+        @Override
+        public void tick(PonderScene scene) {
+            if (executed) {
+                return;
+            }
+            executed = true;
+            if (callback != null) {
+                callback.accept(scene);
+            }
+        }
     }
 }

@@ -2,25 +2,41 @@ package net.createmod.ponder.foundation.content;
 
 import net.createmod.ponder.Ponder;
 import net.createmod.ponder.api.registration.PonderPlugin;
+import net.createmod.ponder.api.registration.PonderSceneRegistrationHelper;
+import net.createmod.ponder.api.registration.PonderTagRegistrationHelper;
 import net.createmod.ponder.api.registration.SharedTextRegistrationHelper;
+import net.minecraft.init.Blocks;
 import net.minecraft.util.ResourceLocation;
 
-/** Vanilla-only reference plugin proving the public registration and scene DSL end to end. */
-public final class BasePonderPlugin implements PonderPlugin {
-    public static final ResourceLocation BASICS = id("basics");
-    static final ResourceLocation STORAGE = id("storage");
-    static final ResourceLocation MECHANICS = id("mechanics");
-    static final ResourceLocation REDSTONE = id("redstone");
-    static final ResourceLocation RENDERING = id("rendering");
+public class BasePonderPlugin implements PonderPlugin {
 
-    @Override public String getModId() { return Ponder.CONTENT_NAMESPACE; }
+    private static final ResourceLocation WELCOME_TAG = Ponder.asResource("welcome");
+    private static final ResourceLocation CRAFTING_TABLE = new ResourceLocation("minecraft", "crafting_table");
+
+    @Override
+    public String getModId() {
+        return Ponder.MOD_ID;
+    }
+
+    @Override
+    public void registerScenes(PonderSceneRegistrationHelper<ResourceLocation> helper) {
+        helper.addStoryBoard(CRAFTING_TABLE, Ponder.asResource("mmce/empty"), TemplateScenes::templateMethod, WELCOME_TAG);
+    }
+
+    @Override
+    public void registerTags(PonderTagRegistrationHelper<ResourceLocation> helper) {
+        helper.registerTag(WELCOME_TAG)
+            .title("开始原版教学")
+            .description("通过人物操作学习工作台与当前实例的合成配方。")
+            .item(Blocks.CRAFTING_TABLE)
+            .addToIndex()
+            .register();
+
+        helper.addTagToComponent(CRAFTING_TABLE, WELCOME_TAG);
+    }
 
     @Override
     public void registerSharedText(SharedTextRegistrationHelper helper) {
-        helper.registerSharedText("demo.controls", "Drag to rotate and scroll to zoom");
-    }
-
-    private static ResourceLocation id(String path) {
-        return new ResourceLocation(Ponder.CONTENT_NAMESPACE, path);
+        helper.registerSharedText("backport.placeholder", "Ponder 原版操作教学");
     }
 }

@@ -4,6 +4,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3i;
 
 public interface SelectionUtil {
+
     Selection everywhere();
 
     Selection position(int x, int y, int z);
@@ -22,8 +23,5 @@ public interface SelectionUtil {
 
     Selection layers(int y, int height);
 
-    Selection structureGroup(String name);
-
-    /** Size is an inclusive offset, matching the upstream scene DSL. */
     Selection cuboid(BlockPos origin, Vec3i size);
 }

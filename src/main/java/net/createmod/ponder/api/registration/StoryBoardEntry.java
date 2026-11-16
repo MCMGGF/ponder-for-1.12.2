@@ -1,11 +1,14 @@
 package net.createmod.ponder.api.registration;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 import net.createmod.ponder.api.scene.PonderStoryBoard;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
 public interface StoryBoardEntry {
+
     PonderStoryBoard getBoard();
 
     String getNamespace();
@@ -18,19 +21,14 @@ public interface StoryBoardEntry {
 
     List<SceneOrderingEntry> getOrderingEntries();
 
-    default StoryBoardEntry identifiedBy(String sceneId) {
-        if (sceneId == null || sceneId.trim().isEmpty())
-            throw new IllegalArgumentException("Declared Ponder scene id is required");
-        return identifiedBy(sceneId.indexOf(':') >= 0
-            ? new ResourceLocation(sceneId) : new ResourceLocation(getNamespace(), sceneId));
+    /** Only automatic item entry points apply this filter; stable-id/manual entry points remain available. */
+    default boolean matchesStack(ItemStack stack) {
+        return true;
     }
 
-    default StoryBoardEntry identifiedBy(ResourceLocation sceneId) {
-        return this;
-    }
-
-    default ResourceLocation getDeclaredSceneId() {
-        return null;
+    /** Further restricts this entry without replacing a component-wide matcher. */
+    default StoryBoardEntry withStackFilter(Predicate<ItemStack> filter) {
+        throw new UnsupportedOperationException("This storyboard entry does not support item filters");
     }
 
     default StoryBoardEntry orderBefore(String otherSceneId) {
@@ -52,7 +50,8 @@ public interface StoryBoardEntry {
     StoryBoardEntry highlightAllTags();
 
     enum SceneOrderingType {
-        BEFORE, AFTER
+        BEFORE,
+        AFTER
     }
 
     final class SceneOrderingEntry {
@@ -60,26 +59,8 @@ public interface StoryBoardEntry {
         private final ResourceLocation sceneId;
 
         public SceneOrderingEntry(SceneOrderingType type, ResourceLocation sceneId) {
-            if (type == null || sceneId == null)
-                throw new IllegalArgumentException("Ordering type and scene id are required");
             this.type = type;
             this.sceneId = sceneId;
-        }
-
-        public SceneOrderingType getType() {
-            return type;
-        }
-
-        public SceneOrderingType type() {
-            return type;
-        }
-
-        public ResourceLocation getSceneId() {
-            return sceneId;
-        }
-
-        public ResourceLocation sceneId() {
-            return sceneId;
         }
 
         public static SceneOrderingEntry after(String namespace, String sceneId) {
@@ -88,6 +69,14 @@ public interface StoryBoardEntry {
 
         public static SceneOrderingEntry before(String namespace, String sceneId) {
             return new SceneOrderingEntry(SceneOrderingType.BEFORE, new ResourceLocation(namespace, sceneId));
+        }
+
+        public SceneOrderingType getType() {
+            return type;
+        }
+
+        public ResourceLocation getSceneId() {
+            return sceneId;
         }
     }
 }

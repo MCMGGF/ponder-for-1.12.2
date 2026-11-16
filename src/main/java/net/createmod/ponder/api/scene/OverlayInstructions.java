@@ -4,22 +4,57 @@ import net.createmod.catnip.math.Pointing;
 import net.createmod.ponder.api.PonderPalette;
 import net.createmod.ponder.api.element.InputElementBuilder;
 import net.createmod.ponder.api.element.TextElementBuilder;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 public interface OverlayInstructions {
+
     TextElementBuilder showText(int duration);
+
     TextElementBuilder showOutlineWithText(Selection selection, int duration);
+
+    GuiSnapshotBuilder showGuiSnapshot(String snapshotId, int duration);
+
+    GuiSnapshotBuilder showGuiSnapshot(net.minecraft.util.ResourceLocation snapshotId, int duration);
+
+    GuiSnapshotBuilder showGuiSnapshot(net.minecraft.util.ResourceLocation texture, int width, int height, int duration);
+
+    GuiSnapshotBuilder showBlockGui(net.minecraft.util.ResourceLocation blockId, int meta, int width, int height,
+        int duration);
+
+    GuiSnapshotBuilder showBlockGui(net.minecraft.util.ResourceLocation blockId, int meta, NBTTagCompound tileNbt,
+        int width, int height, int duration);
+
+    default GuiSnapshotBuilder showBlockGui(net.minecraft.util.ResourceLocation blockId, int width, int height,
+        int duration) {
+        return showBlockGui(blockId, 0, width, height, duration);
+    }
+
     InputElementBuilder showControls(Vec3d sceneSpace, Pointing direction, int duration);
+
     void chaseBoundingBoxOutline(PonderPalette color, Object slot, AxisAlignedBB boundingBox, int duration);
+
+    /** Follows the selected blocks, including their preview transforms and selection shapes. */
+    default void chaseOutline(PonderPalette color, Object slot, Selection selection, int duration) {
+        showOutline(color, slot, selection, duration);
+    }
+
     void showCenteredScrollInput(BlockPos pos, EnumFacing side, int duration);
+
     void showScrollInput(Vec3d location, EnumFacing side, int duration);
+
     void showRepeaterScrollInput(BlockPos pos, int duration);
+
     void showFilterSlotInput(Vec3d location, int duration);
+
     void showFilterSlotInput(Vec3d location, EnumFacing side, int duration);
+
     void showLine(PonderPalette color, Vec3d start, Vec3d end, int duration);
+
     void showBigLine(PonderPalette color, Vec3d start, Vec3d end, int duration);
+
     void showOutline(PonderPalette color, Object slot, Selection selection, int duration);
 }

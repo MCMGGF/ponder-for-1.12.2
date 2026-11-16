@@ -7,11 +7,12 @@ import net.createmod.ponder.foundation.PonderTag;
 import net.minecraft.util.ResourceLocation;
 
 public interface TagRegistryAccess {
+
     PonderTag getRegisteredTag(ResourceLocation tagLocation);
 
     List<PonderTag> getListedTags();
 
-    Set<PonderTag> getTags(ResourceLocation component);
+    Set<PonderTag> getTags(ResourceLocation componentId);
 
     Set<ResourceLocation> getItems(ResourceLocation tag);
 

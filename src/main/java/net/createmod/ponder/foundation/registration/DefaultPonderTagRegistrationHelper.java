@@ -9,50 +9,67 @@ import net.createmod.ponder.api.registration.TagBuilder;
 import net.createmod.ponder.foundation.PonderTag;
 import net.minecraft.util.ResourceLocation;
 
-public final class DefaultPonderTagRegistrationHelper implements PonderTagRegistrationHelper<ResourceLocation> {
+public class DefaultPonderTagRegistrationHelper implements PonderTagRegistrationHelper<ResourceLocation> {
+
     private final String namespace;
-    private final PonderTagRegistry registry;
+    private final PonderTagRegistry tagRegistry;
     private final PonderLocalization localization;
 
-    public DefaultPonderTagRegistrationHelper(String namespace, PonderTagRegistry registry,
-                                               PonderLocalization localization) {
+    public DefaultPonderTagRegistrationHelper(String namespace, PonderTagRegistry tagRegistry,
+        PonderLocalization localization) {
         this.namespace = namespace;
-        this.registry = registry;
+        this.tagRegistry = tagRegistry;
         this.localization = localization;
     }
 
     @Override
-    public <S> PonderTagRegistrationHelper<S> withKeyFunction(Function<S, ResourceLocation> keyGen) {
-        return new GenericPonderTagRegistrationHelper<S>(this, keyGen);
+    public <T> PonderTagRegistrationHelper<T> withKeyFunction(Function<T, ResourceLocation> keyGen) {
+        return new GenericPonderTagRegistrationHelper<T>(this, keyGen);
     }
 
-    @Override public TagBuilder registerTag(ResourceLocation location) { return new PonderTagBuilder(location, this::finish); }
-    @Override public TagBuilder registerTag(String id) { return registerTag(new ResourceLocation(namespace, id)); }
-
-    private void finish(PonderTagBuilder builder) {
-        localization.registerTag(builder.id, builder.title, builder.description);
-        PonderTag tag = new PonderTag(builder.id, builder.textureIconLocation, builder.itemIcon, builder.mainItem);
-        registry.registerTag(tag);
-        if (builder.addToIndex) registry.listTag(tag);
+    @Override
+    public TagBuilder registerTag(ResourceLocation location) {
+        return new PonderTagBuilder(location, this);
     }
 
-    @Override public void addTagToComponent(ResourceLocation component, ResourceLocation tag) {
-        registry.addTagToComponent(tag, component);
+    @Override
+    public TagBuilder registerTag(String id) {
+        return new PonderTagBuilder(new ResourceLocation(namespace, id), this);
     }
 
-    @Override public MultiTagBuilder.Tag<ResourceLocation> addToTag(ResourceLocation tag) {
-        return new GenericMultiTagBuilder.TagImpl<ResourceLocation>(this, Arrays.asList(tag));
+    void finishTagRegister(PonderTagBuilder builder) {
+        localization.registerTag(builder.getId(), builder.getTitle(), builder.getDescription());
+
+        PonderTag tag = new PonderTag(builder.getId(), builder.getTextureIconLocation(), builder.getItemIcon(),
+            builder.getMainItem());
+        tagRegistry.registerTag(tag);
+        if (builder.shouldAddToIndex()) {
+            tagRegistry.listTag(tag);
+        }
     }
 
-    @Override public MultiTagBuilder.Tag<ResourceLocation> addToTag(ResourceLocation... tags) {
-        return new GenericMultiTagBuilder.TagImpl<ResourceLocation>(this, Arrays.asList(tags));
+    @Override
+    public void addTagToComponent(ResourceLocation component, ResourceLocation tag) {
+        tagRegistry.addTagToComponent(tag, component);
     }
 
-    @Override public MultiTagBuilder.Component addToComponent(ResourceLocation component) {
-        return new GenericMultiTagBuilder.ComponentImpl<ResourceLocation>(this, Arrays.asList(component));
+    @Override
+    public MultiTagBuilder.Tag<ResourceLocation> addToTag(ResourceLocation tag) {
+        return new GenericMultiTagBuilder<ResourceLocation>().new Tag(this, Arrays.asList(tag));
     }
 
-    @Override public MultiTagBuilder.Component addToComponent(ResourceLocation... components) {
-        return new GenericMultiTagBuilder.ComponentImpl<ResourceLocation>(this, Arrays.asList(components));
+    @Override
+    public MultiTagBuilder.Tag<ResourceLocation> addToTag(ResourceLocation... tags) {
+        return new GenericMultiTagBuilder<ResourceLocation>().new Tag(this, Arrays.asList(tags));
+    }
+
+    @Override
+    public MultiTagBuilder.Component addToComponent(ResourceLocation component) {
+        return new GenericMultiTagBuilder<ResourceLocation>().new Component(this, Arrays.asList(component));
+    }
+
+    @Override
+    public MultiTagBuilder.Component addToComponent(ResourceLocation... components) {
+        return new GenericMultiTagBuilder<ResourceLocation>().new Component(this, Arrays.asList(components));
     }
 }

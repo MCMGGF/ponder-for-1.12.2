@@ -1,6 +1,4 @@
 package net.createmod.ponder.api.element;
 
-import net.minecraft.entity.Entity;
-
-public interface EntityElement extends TrackedElement<Entity> {
+public interface EntityElement extends AnimatedSceneElement {
 }

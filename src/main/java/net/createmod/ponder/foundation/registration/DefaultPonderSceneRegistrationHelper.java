@@ -10,52 +10,48 @@ import net.createmod.ponder.api.scene.PonderStoryBoard;
 import net.createmod.ponder.foundation.PonderStoryBoardEntry;
 import net.minecraft.util.ResourceLocation;
 
-public final class DefaultPonderSceneRegistrationHelper implements PonderSceneRegistrationHelper<ResourceLocation> {
+public class DefaultPonderSceneRegistrationHelper implements PonderSceneRegistrationHelper<ResourceLocation> {
+
     private final String namespace;
-    private final String pluginClass;
-    private final PonderSceneRegistry registry;
+    private final PonderSceneRegistry sceneRegistry;
 
-    public DefaultPonderSceneRegistrationHelper(String namespace, PonderSceneRegistry registry) {
-        this(namespace, "", registry);
-    }
-
-    public DefaultPonderSceneRegistrationHelper(String namespace, String pluginClass,
-                                                 PonderSceneRegistry registry) {
-        if (namespace == null || namespace.trim().isEmpty())
-            throw new IllegalArgumentException("Plugin namespace may not be blank");
+    public DefaultPonderSceneRegistrationHelper(String namespace, PonderSceneRegistry sceneRegistry) {
         this.namespace = namespace;
-        this.pluginClass = pluginClass == null ? "" : pluginClass;
-        this.registry = registry;
+        this.sceneRegistry = sceneRegistry;
     }
 
     @Override
-    public <S> PonderSceneRegistrationHelper<S> withKeyFunction(Function<S, ResourceLocation> keyGen) {
-        return new GenericPonderSceneRegistrationHelper<S>(this, keyGen);
+    public <T> PonderSceneRegistrationHelper<T> withKeyFunction(Function<T, ResourceLocation> keyGen) {
+        return new GenericPonderSceneRegistrationHelper<T>(this, keyGen);
     }
 
     @Override
     public StoryBoardEntry addStoryBoard(ResourceLocation component, ResourceLocation schematicLocation,
-                                         PonderStoryBoard storyBoard, ResourceLocation... tags) {
+        PonderStoryBoard storyBoard, ResourceLocation... tags) {
         PonderStoryBoardEntry entry = new PonderStoryBoardEntry(storyBoard, namespace, schematicLocation, component);
-        entry.setPluginClass(pluginClass);
         entry.highlightTags(tags);
-        registry.addStoryBoard(entry);
+        sceneRegistry.addStoryBoard(entry);
         return entry;
     }
 
     @Override
-    public StoryBoardEntry addStoryBoard(ResourceLocation component, String schematicPath,
-                                         PonderStoryBoard storyBoard, ResourceLocation... tags) {
+    public StoryBoardEntry addStoryBoard(ResourceLocation component, String schematicPath, PonderStoryBoard storyBoard,
+        ResourceLocation... tags) {
         return addStoryBoard(component, asLocation(schematicPath), storyBoard, tags);
     }
 
-    @Override public MultiSceneBuilder forComponents(ResourceLocation... components) {
+    @Override
+    public MultiSceneBuilder forComponents(ResourceLocation... components) {
         return new GenericMultiSceneBuilder<ResourceLocation>(this, Arrays.asList(components));
     }
 
-    @Override public MultiSceneBuilder forComponents(Iterable<? extends ResourceLocation> components) {
+    @Override
+    public MultiSceneBuilder forComponents(Iterable<? extends ResourceLocation> components) {
         return new GenericMultiSceneBuilder<ResourceLocation>(this, components);
     }
 
-    @Override public ResourceLocation asLocation(String path) { return new ResourceLocation(namespace, path); }
+    @Override
+    public ResourceLocation asLocation(String path) {
+        return new ResourceLocation(namespace, path);
+    }
 }

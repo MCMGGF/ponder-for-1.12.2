@@ -2,24 +2,50 @@ package net.createmod.ponder;
 
 import java.util.Random;
 
+import net.createmod.ponder.foundation.PonderIndex;
+import net.createmod.ponder.foundation.content.BasePonderPlugin;
+import net.createmod.ponder.foundation.content.VanillaPonderPlugin;
+import net.createmod.ponder.foundation.content.ComplexTestPonderPlugin;
+import net.createmod.ponder.foundation.content.DebugPonderPlugin;
+import net.createmod.ponder.foundation.content.ThermalExpansionPonderPlugin;
+import net.createmod.ponder.foundation.content.UiTestPonderPlugin;
+import net.createmod.ponder.foundation.content.MmcePonderPlugin;
+import net.createmod.ponder.foundation.external.ExternalPonderPlugin;
+import net.minecraft.util.ResourceLocation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import net.minecraft.util.ResourceLocation;
-
 public final class Ponder {
 
-    public static final String MOD_ID = "ponder_legacy";
-    public static final String CONTENT_NAMESPACE = "ponder";
-    public static final String MOD_NAME = "Ponder";
-    public static final String VERSION = "1.3.0-alpha.1-mc1.12.2";
+    public static final String MOD_ID = Reference.MOD_ID;
+    public static final String MOD_NAME = Reference.MOD_NAME;
     public static final Logger LOGGER = LogManager.getLogger(MOD_NAME);
     public static final Random RANDOM = new Random();
+
+    private static boolean initialized;
 
     private Ponder() {
     }
 
     public static ResourceLocation asResource(String path) {
-        return new ResourceLocation(CONTENT_NAMESPACE, path);
+        return new ResourceLocation(MOD_ID, path);
+    }
+
+    public static synchronized void init() {
+        if (initialized) {
+            return;
+        }
+
+        PonderIndex.addPlugin(new BasePonderPlugin());
+        PonderIndex.addPlugin(new VanillaPonderPlugin());
+        PonderIndex.addPlugin(new DebugPonderPlugin());
+        PonderIndex.addPlugin(new ThermalExpansionPonderPlugin());
+        PonderIndex.addPlugin(new UiTestPonderPlugin());
+        PonderIndex.addPlugin(new ComplexTestPonderPlugin());
+        PonderIndex.addPlugin(new MmcePonderPlugin());
+        PonderIndex.addPlugin(new net.createmod.ponder.foundation.content.oil.OilProductionLinePlugin());
+        PonderIndex.addPlugin(new ExternalPonderPlugin());
+        PonderIndex.addPlugin(new net.createmod.ponder.authoring.AuthoringPlugin());
+        initialized = true;
     }
 }

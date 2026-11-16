@@ -1,31 +1,28 @@
 package net.createmod.ponder.api;
 
-import net.createmod.catnip.theme.Color;
-
-/** Colors used by the built-in scene overlays. */
 public enum PonderPalette {
-    WHITE(0xeeeeee),
+
+    WHITE(0xEEEEEE),
     BLACK(0x221111),
-    RED(0xff5d6c),
-    GREEN(0x8cba51),
-    BLUE(0x5f6caf),
-    SLOW(0x22ff22),
-    MEDIUM(0x0084ff),
-    FAST(0xff55ff),
-    INPUT(0x7fcde0),
-    OUTPUT(0xddc166);
 
-    private final Color color;
+    RED(0xFF5D6C),
+    GREEN(0x8CBA51),
+    BLUE(0x5F6CAF),
 
-    PonderPalette(int rgb) {
-        color = new Color(rgb, false).setImmutable();
+    SLOW(0x22FF22),
+    MEDIUM(0x0084FF),
+    FAST(0xFF55FF),
+
+    INPUT(0x7FCDE0),
+    OUTPUT(0xDDC166);
+
+    private final int color;
+
+    PonderPalette(int color) {
+        this.color = color;
     }
 
     public int getColor() {
-        return color.getRGB();
-    }
-
-    public Color getColorObject() {
         return color;
     }
 }

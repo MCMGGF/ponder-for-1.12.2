@@ -1,17 +1,11 @@
 {
-  "required": true,
-  "minVersion": "0.8",
   "package": "net.createmod.ponder.mixin",
-  "compatibilityLevel": "JAVA_8",
-  "refmap": "mixins.ponder.refmap.json",
+  "required": true,
+  "refmap": "${mixin_refmap}",
+  "target": "@env(DEFAULT)",
+  "minVersion": "0.8.5",
+  "compatibilityLevel": "JAVA_16",
   "mixins": [],
-  "client": [
-    "MinecraftResizeMixin",
-    "GuiContainerAccessor",
-    "BufferBuilderAccessor",
-    "ParticleManagerAccessor"
-  ],
-  "injectors": {
-    "defaultRequire": 1
-  }
+  "server": [],
+  "client": []
 }

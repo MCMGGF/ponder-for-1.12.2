@@ -1,344 +1,38 @@
-name: Build and Verify
+name: Build
 
 on:
   push:
     branches:
       - main
+      - master
+      - 'cleanroom/**'
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
-concurrency:
-  group: build-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dfile.encoding=UTF-8
-
 jobs:
-  build-test:
-    name: Build, Test, and Package
+  build:
     runs-on: windows-latest
-    timeout-minutes: 45
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Java 8
-        uses: actions/setup-java@v5
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "8"
+          java-version: '25'
+          cache: gradle
 
-      - name: Restore Gradle and RFG cache
-        uses: actions/cache@v6
+      - name: Make Gradle wrapper executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Test and build Cleanroom client and server shim
+        run: ./gradlew.bat test remapJar sourcesJar forgeServerShimJar --stacktrace
+
+      - name: Upload Cleanroom artifacts
+        uses: actions/upload-artifact@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-rfg-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-rfg-${{ runner.os }}-
-
-      - name: Build and run tests
-        shell: powershell
-        run: |
-          .\gradlew.bat clean test build compileClientHarnessJava :ponder-mmce:test :ponder-mmce:build `
-            --no-daemon `
-            --max-workers=1 `
-            --console=plain `
-            --stacktrace
-
-      - name: Verify release artifacts
-        shell: powershell
-        run: |
-          .\tools\verify-release.ps1
-
-      - name: Stage Ponder-MMCE fixture dependencies
-        shell: powershell
-        run: |
-          $cacheRoot = Join-Path $env:USERPROFILE ".gradle\caches\modules-2\files-2.1"
-          $target = "build\verification\ponder-mmce-dependencies"
-          $null = New-Item -ItemType Directory -Path $target -Force
-          $dependencies = @(
-            @{
-              Label = "MixinBooter 11.2"
-              Root = Join-Path $cacheRoot "zone.rong\mixinbooter\11.2"
-              Filter = "mixinbooter-11.2.jar"
-            },
-            @{
-              Label = "CraftTweaker 4.1.20.698"
-              Root = Join-Path $cacheRoot "maven.modrinth\crafttweaker\4.1.20.698"
-              Filter = "crafttweaker-4.1.20.698.jar"
-            },
-            @{
-              Label = "MMCE 2.3.2"
-              Root = Join-Path $cacheRoot `
-                "curse.maven\modularmachinery-community-edition-817377\7372951"
-              Filter = "modularmachinery-community-edition-817377-7372951.jar"
-            }
-          )
-          foreach ($dependency in $dependencies) {
-            $matches = @(Get-ChildItem -LiteralPath $dependency.Root -Recurse -File `
-              -Filter $dependency.Filter)
-            if ($matches.Count -ne 1) {
-              throw "Expected one $($dependency.Label) jar, found $($matches.Count)"
-            }
-            Copy-Item -LiteralPath $matches[0].FullName -Destination $target
-          }
-
-      - name: Write artifact summary
-        shell: powershell
-        run: |
-          "## Ponder 1.3.0-alpha.1 artifacts" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          "| Project | File | SHA-256 |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          "| --- | --- | --- |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-          $artifacts = [Collections.Generic.List[object]]::new()
-          Get-ChildItem -LiteralPath "build\libs" -Filter "*.jar" -File |
-            ForEach-Object { $artifacts.Add([PSCustomObject]@{ Project = "Ponder"; File = $_ }) }
-          $smoke = Get-Item -LiteralPath `
-            "ponder-mmce\build\distributions\Ponder-MMCE-Smoke-Pack-0.1.0-alpha.zip"
-          $artifacts.Add([PSCustomObject]@{ Project = "Integrated MMCE Smoke Pack"; File = $smoke })
-          $examples = Get-Item -LiteralPath `
-            "build\distributions\Ponder-ZenScript-Examples-1.3.0-alpha.1.zip"
-          $artifacts.Add([PSCustomObject]@{ Project = "ZenScript Examples"; File = $examples })
-          $addonSmoke = Get-Item -LiteralPath `
-            "build\distributions\Ponder-Example-Addon-Smoke-1.3.0-alpha.1.zip"
-          $artifacts.Add([PSCustomObject]@{ Project = "Example Addon Smoke"; File = $addonSmoke })
-          $jsonExamples = Get-Item -LiteralPath `
-            "build\distributions\Ponder-JSON-Examples-1.3.0-alpha.1.zip"
-          $artifacts.Add([PSCustomObject]@{ Project = "JSON Examples"; File = $jsonExamples })
-          $jsonTools = Get-Item -LiteralPath `
-            "build\distributions\Ponder-JSON-Tools-1.3.0-alpha.1.zip"
-          $artifacts.Add([PSCustomObject]@{ Project = "JSON Tools"; File = $jsonTools })
-          $clientHarness = Get-Item -LiteralPath `
-            "build\verification\client-harness\Ponder-Client-Harness-1.12.2-1.3.0-alpha.1.jar"
-          $artifacts.Add([PSCustomObject]@{ Project = "Client Harness"; File = $clientHarness })
-          $acceptanceKit = Get-Item -LiteralPath `
-            "build\distributions\Ponder-Client-Acceptance-Kit-1.3.0-alpha.1.zip"
-          $artifacts.Add([PSCustomObject]@{ Project = "Client Acceptance Kit"; File = $acceptanceKit })
-
-          $checksumLines = [Collections.Generic.List[string]]::new()
-          foreach ($artifact in @($artifacts | Sort-Object { $_.File.Name })) {
-            $hash = (Get-FileHash -LiteralPath $artifact.File.FullName -Algorithm SHA256).Hash
-            "| $($artifact.Project) | ``$($artifact.File.Name)`` | ``$hash`` |" |
-              Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-            $checksumLines.Add("$hash  $($artifact.File.Name)")
-          }
-          $null = New-Item -ItemType Directory -Path "build\reports" -Force
-          [IO.File]::WriteAllLines("build\reports\SHA256SUMS.txt", $checksumLines,
-            [Text.UTF8Encoding]::new($false))
-
-      - name: Upload release jars
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-1.3.0-alpha.1-${{ github.sha }}
+          name: cleanroom-artifacts
           path: build/libs/*.jar
           if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload Ponder-MMCE Smoke Pack
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-mmce-smoke-${{ github.sha }}
-          path: ponder-mmce/build/distributions/Ponder-MMCE-Smoke-Pack-0.1.0-alpha.zip
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload Ponder ZenScript Examples
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-zenscript-examples-${{ github.sha }}
-          path: build/distributions/Ponder-ZenScript-Examples-1.3.0-alpha.1.zip
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload Ponder JSON Examples
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-json-examples-${{ github.sha }}
-          path: build/distributions/Ponder-JSON-Examples-1.3.0-alpha.1.zip
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload Ponder JSON Tools
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-json-tools-${{ github.sha }}
-          path: |
-            build/distributions/Ponder-JSON-Tools-1.3.0-alpha.1.zip
-            schemas/*.json
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload Ponder Example Addon Smoke Pack
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-example-addon-smoke-${{ github.sha }}
-          path: build/distributions/Ponder-Example-Addon-Smoke-1.3.0-alpha.1.zip
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload API compatibility report
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-api-signature-${{ github.sha }}
-          path: |
-            build/reports/api/**
-            api-signatures/ponder-api-1.2.0.sig
-            api-signatures/ponder-api-1.3.0.sig
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload Ponder-MMCE harnesses
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-mmce-harnesses-${{ github.sha }}
-          path: |
-            ponder-mmce/build/verification/client-harness/*.jar
-            ponder-mmce/build/verification/server-harness/*.jar
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload Ponder-MMCE fixture dependencies
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-mmce-dependencies-${{ github.sha }}
-          path: build/verification/ponder-mmce-dependencies/*.jar
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload server fixture harness
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-server-harness-${{ github.sha }}
-          path: build/verification/server-harness/*.jar
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload client acceptance harness
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-client-harness-${{ github.sha }}
-          path: build/verification/client-harness/*.jar
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload client acceptance kit
-        uses: actions/upload-artifact@v7
-        with:
-          name: ponder-client-acceptance-kit-${{ github.sha }}
-          path: build/distributions/Ponder-Client-Acceptance-Kit-1.3.0-alpha.1.zip
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload build reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: build-reports-${{ github.sha }}
-          path: |
-            build/reports/**
-            build/test-results/**
-            logs/ponder/diagnostics/**
-            ponder-mmce/build/reports/**
-            ponder-mmce/build/test-results/**
-          if-no-files-found: warn
-          retention-days: 14
-
-  forge-server:
-    name: Standard Forge Server
-    needs: build-test
-    runs-on: windows-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Java 8
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "8"
-
-      - name: Restore Forge server runtime
-        uses: actions/cache@v6
-        with:
-          path: build/forge-2847-server-source
-          key: forge-server-1.12.2-14.23.5.2847-v1
-
-      - name: Download release jars
-        uses: actions/download-artifact@v8
-        with:
-          name: ponder-1.3.0-alpha.1-${{ github.sha }}
-          path: build/libs
-
-      - name: Download server fixture harness
-        uses: actions/download-artifact@v8
-        with:
-          name: ponder-server-harness-${{ github.sha }}
-          path: build/verification/server-harness
-
-      - name: Download Ponder-MMCE Smoke Pack
-        uses: actions/download-artifact@v8
-        with:
-          name: ponder-mmce-smoke-${{ github.sha }}
-          path: ponder-mmce/build/distributions
-
-      - name: Download Ponder-MMCE harnesses
-        uses: actions/download-artifact@v8
-        with:
-          name: ponder-mmce-harnesses-${{ github.sha }}
-          path: ponder-mmce/build/verification
-
-      - name: Download Ponder-MMCE fixture dependencies
-        uses: actions/download-artifact@v8
-        with:
-          name: ponder-mmce-dependencies-${{ github.sha }}
-          path: build/verification/ponder-mmce-dependencies
-
-      - name: Run dedicated-server verification
-        shell: powershell
-        run: |
-          .\tools\test-standard-forge.ps1 `
-            -JavaExecutable "$env:JAVA_HOME\bin\java.exe" `
-            -TimeoutSeconds 600 `
-            -ServerPort 25576
-
-      - name: Run real Ponder-MMCE fixture
-        shell: powershell
-        run: |
-          $dependencies = "build\verification\ponder-mmce-dependencies"
-          .\tools\test-ponder-mmce-forge.ps1 `
-            -MixinBooterJar (Join-Path $dependencies "mixinbooter-11.2.jar") `
-            -CraftTweakerJar (Join-Path $dependencies "crafttweaker-4.1.20.698.jar") `
-            -MMCEJar (Join-Path $dependencies `
-              "modularmachinery-community-edition-817377-7372951.jar") `
-            -JavaExecutable "$env:JAVA_HOME\bin\java.exe" `
-            -TimeoutSeconds 600 `
-            -ServerPort 25578
-
-      - name: Upload server reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: forge-server-reports-${{ github.sha }}
-          path: |
-            build/reports/standard-forge-verification-*.md
-            build/standard-forge-smoke/**/*-console.log
-            build/standard-forge-smoke/**/*-crafttweaker.log
-            build/standard-forge-smoke/**/crash-reports/**
-            build/standard-forge-smoke/**/logs/**
-            build/reports/ponder-mmce-forge-verification-*.md
-            build/ponder-mmce-forge-smoke/**/*-console.log
-            build/ponder-mmce-forge-smoke/**/ponder-mmce-fixture-harness.properties
-            build/ponder-mmce-forge-smoke/**/crafttweaker.log
-            build/ponder-mmce-forge-smoke/**/crash-reports/**
-            build/ponder-mmce-forge-smoke/**/logs/**
-          if-no-files-found: warn
-          retention-days: 14

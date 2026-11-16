@@ -5,6 +5,7 @@ import java.util.function.BiConsumer;
 import net.minecraft.util.ResourceLocation;
 
 public interface LangRegistryAccess {
+
     void provideLang(String modId, BiConsumer<String, String> consumer);
 
     String getShared(ResourceLocation key);

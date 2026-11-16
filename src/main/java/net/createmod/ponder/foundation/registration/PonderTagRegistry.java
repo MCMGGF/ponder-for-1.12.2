@@ -8,89 +8,108 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import net.createmod.ponder.Ponder;
 import net.createmod.ponder.api.registration.TagRegistryAccess;
 import net.createmod.ponder.foundation.PonderTag;
+import net.minecraft.init.Blocks;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
-public final class PonderTagRegistry implements TagRegistryAccess {
-    private final Map<ResourceLocation, PonderTag> tags = new LinkedHashMap<ResourceLocation, PonderTag>();
-    private final Map<ResourceLocation, LinkedHashSet<ResourceLocation>> componentTags =
-        new LinkedHashMap<ResourceLocation, LinkedHashSet<ResourceLocation>>();
+public class PonderTagRegistry implements TagRegistryAccess {
+
+    private final Map<ResourceLocation, Set<ResourceLocation>> componentTagMap =
+        new LinkedHashMap<ResourceLocation, Set<ResourceLocation>>();
+    private final Map<ResourceLocation, PonderTag> registeredTags = new LinkedHashMap<ResourceLocation, PonderTag>();
     private final List<PonderTag> listedTags = new ArrayList<PonderTag>();
-    private boolean frozen;
+    private final PonderTag missing = new PonderTag(Ponder.asResource("not_registered"), null,
+        new ItemStack(Blocks.BARRIER), new ItemStack(Blocks.BARRIER));
 
-    public synchronized void clearRegistry() {
-        tags.clear();
-        componentTags.clear();
+    private boolean allowRegistration = true;
+
+    public PonderTagRegistry(PonderLocalization localization) {
+    }
+
+    public void clearRegistry() {
+        componentTagMap.clear();
+        registeredTags.clear();
         listedTags.clear();
-        frozen = false;
+        allowRegistration = true;
     }
 
-    public synchronized void freeze() {
-        frozen = true;
-    }
-
-    public synchronized void registerTag(PonderTag tag) {
-        checkMutable();
-        if (tags.containsKey(tag.getId()))
-            throw new IllegalArgumentException("Ponder tag already registered: " + tag.getId());
-        tags.put(tag.getId(), tag);
-    }
-
-    public synchronized void listTag(PonderTag tag) {
-        checkMutable();
-        if (!listedTags.contains(tag))
-            listedTags.add(tag);
-    }
-
-    public synchronized void addTagToComponent(ResourceLocation tag, ResourceLocation component) {
-        checkMutable();
-        LinkedHashSet<ResourceLocation> assigned = componentTags.get(component);
-        if (assigned == null) {
-            assigned = new LinkedHashSet<ResourceLocation>();
-            componentTags.put(component, assigned);
+    public void registerTag(PonderTag tag) {
+        if (!allowRegistration) {
+            throw new IllegalStateException("Registration phase has already ended");
         }
-        assigned.add(tag);
+        registeredTags.put(tag.getId(), tag);
     }
 
-    private void checkMutable() {
-        if (frozen)
-            throw new IllegalStateException("Ponder tag registration is frozen");
+    public void listTag(PonderTag tag) {
+        if (!allowRegistration) {
+            throw new IllegalStateException("Registration phase has already ended");
+        }
+        for (int i = 0; i < listedTags.size(); i++) {
+            if (listedTags.get(i).getId().equals(tag.getId())) {
+                listedTags.set(i, tag);
+                return;
+            }
+        }
+        listedTags.add(tag);
+    }
+
+    public void addTagToComponent(ResourceLocation tag, ResourceLocation component) {
+        if (!allowRegistration) {
+            throw new IllegalStateException("Registration phase has already ended");
+        }
+        Set<ResourceLocation> tags = componentTagMap.get(component);
+        if (tags == null) {
+            tags = new LinkedHashSet<ResourceLocation>();
+            componentTagMap.put(component, tags);
+        }
+        tags.add(tag);
+    }
+
+    public int getListedTagCount() {
+        return listedTags.size();
     }
 
     @Override
-    public synchronized PonderTag getRegisteredTag(ResourceLocation location) {
-        PonderTag tag = tags.get(location);
-        return tag == null ? PonderTag.missing(location) : tag;
+    public PonderTag getRegisteredTag(ResourceLocation tagLocation) {
+        PonderTag tag = registeredTags.get(tagLocation);
+        return tag != null ? tag : missing;
     }
 
     @Override
-    public synchronized List<PonderTag> getListedTags() {
-        return Collections.unmodifiableList(new ArrayList<PonderTag>(listedTags));
+    public List<PonderTag> getListedTags() {
+        return Collections.unmodifiableList(listedTags);
     }
 
     @Override
-    public synchronized Set<PonderTag> getTags(ResourceLocation component) {
-        LinkedHashSet<ResourceLocation> assigned = componentTags.get(component);
-        if (assigned == null)
+    public Set<PonderTag> getTags(ResourceLocation componentId) {
+        Set<ResourceLocation> tagIds = componentTagMap.get(componentId);
+        if (tagIds == null || tagIds.isEmpty()) {
             return Collections.emptySet();
-        LinkedHashSet<PonderTag> result = new LinkedHashSet<PonderTag>();
-        for (ResourceLocation location : assigned)
-            result.add(getRegisteredTag(location));
-        return Collections.unmodifiableSet(result);
+        }
+
+        Set<PonderTag> tags = new LinkedHashSet<PonderTag>();
+        for (ResourceLocation tagId : tagIds) {
+            tags.add(getRegisteredTag(tagId));
+        }
+        return Collections.unmodifiableSet(tags);
     }
 
     @Override
-    public synchronized Set<ResourceLocation> getItems(ResourceLocation tag) {
-        LinkedHashSet<ResourceLocation> result = new LinkedHashSet<ResourceLocation>();
-        for (Map.Entry<ResourceLocation, LinkedHashSet<ResourceLocation>> entry : componentTags.entrySet())
-            if (entry.getValue().contains(tag))
-                result.add(entry.getKey());
-        return Collections.unmodifiableSet(result);
+    public Set<ResourceLocation> getItems(ResourceLocation tag) {
+        Set<ResourceLocation> components = new LinkedHashSet<ResourceLocation>();
+        for (Map.Entry<ResourceLocation, Set<ResourceLocation>> entry : componentTagMap.entrySet()) {
+            if (entry.getValue().contains(tag)) {
+                components.add(entry.getKey());
+            }
+        }
+        return Collections.unmodifiableSet(components);
     }
 
     @Override
     public Set<ResourceLocation> getItems(PonderTag tag) {
-        return tag == null ? Collections.<ResourceLocation>emptySet() : getItems(tag.getId());
+        return getItems(tag.getId());
     }
 }

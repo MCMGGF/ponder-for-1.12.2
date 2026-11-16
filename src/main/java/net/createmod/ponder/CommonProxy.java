@@ -1,26 +1,19 @@
 package net.createmod.ponder;
 
-import net.createmod.catnip.net.CatnipPackets;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLLoadCompleteEvent;
-import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.FMLCommonHandler;
-import net.createmod.ponder.script.ScriptSyncEvents;
-
 public class CommonProxy {
 
-    public void preInit(FMLPreInitializationEvent event) {
-        CatnipPackets.register();
-        FMLCommonHandler.instance().bus().register(new ScriptSyncEvents());
+    public void preInit() {
     }
 
-    public void init(FMLInitializationEvent event) {
+    public void init() {
     }
 
-    public void postInit(FMLPostInitializationEvent event) {
+    public void onPonderReload() {
     }
 
-    public void loadComplete(FMLLoadCompleteEvent event) {
+    public void openProjector(net.minecraft.util.math.BlockPos pos, boolean miniature) {
+    }
+
+    public void selectBlueprintCorner(net.minecraft.util.math.BlockPos pos, boolean second) {
     }
 }

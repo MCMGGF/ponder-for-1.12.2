@@ -1,0 +1,1 @@
+{"parent":"minecraft:block/cube","textures":{"particle":"minecraft:blocks/iron_block","down":"minecraft:blocks/iron_block","up":"minecraft:blocks/emerald_block","north":"minecraft:blocks/observer_front","south":"minecraft:blocks/iron_block","west":"minecraft:blocks/iron_block","east":"minecraft:blocks/iron_block"}}

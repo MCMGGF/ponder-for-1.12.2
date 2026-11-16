@@ -6,13 +6,14 @@ import net.createmod.ponder.api.scene.PonderStoryBoard;
 import net.minecraft.util.ResourceLocation;
 
 public interface PonderSceneRegistrationHelper<T> {
+
     <S> PonderSceneRegistrationHelper<S> withKeyFunction(Function<S, T> keyGen);
 
     StoryBoardEntry addStoryBoard(T component, ResourceLocation schematicLocation, PonderStoryBoard storyBoard,
-                                  ResourceLocation... tags);
+        ResourceLocation... tags);
 
     StoryBoardEntry addStoryBoard(T component, String schematicPath, PonderStoryBoard storyBoard,
-                                  ResourceLocation... tags);
+        ResourceLocation... tags);
 
     MultiSceneBuilder forComponents(T... components);
 
