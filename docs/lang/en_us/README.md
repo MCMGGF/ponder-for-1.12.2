@@ -10,6 +10,12 @@ layers to fit the 1.12.2 ecosystem.
 
 ## Status
 
+The repository's `main` branch carries the Cleanroom `0.3.x-beta` line.
+The independent Java 8 / Forge `1.3.0-alpha.1` implementation previously
+on `main` is preserved on
+[`codex/forge-1.3.x`](https://github.com/MCMGGF/ponder-for-1.12.2/tree/codex/forge-1.3.x)
+and has its own API, JSON scene format, and multiplayer support.
+
 This project is usable, but still under active backport and stabilization work.
 
 Current focus:

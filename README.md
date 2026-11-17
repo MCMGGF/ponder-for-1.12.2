@@ -8,12 +8,13 @@ This branch is not a straight upstream recompile. It is a practical backport
 with rewritten UI, rendering, runtime, and compatibility layers for the 1.12.2
 modding environment.
 
-This is the `cleanroom/0.3.x` branch of `MCMGGF/ponder-for-1.12.2`.
-It carries the existing local Cleanroom backport and its `0.3.x-beta` version
-line. The repository's `main` branch maintains the separate Java 8 / Forge
-`1.3.0-alpha.1` implementation; its APIs, JSON format and multiplayer support
-must not be assumed to apply here. See [the changelog](CHANGELOG.md) for the
-Chinese source-publication notes and the recent display fixes.
+The `main` branch of `MCMGGF/ponder-for-1.12.2` carries the Cleanroom
+backport and its `0.3.x-beta` release line. The independent Java 8 / Forge
+`1.3.0-alpha.1` implementation previously on `main` is preserved on
+[`codex/forge-1.3.x`](https://github.com/MCMGGF/ponder-for-1.12.2/tree/codex/forge-1.3.x).
+Each implementation has its own API, JSON scene format, and multiplayer
+support. See [the changelog](CHANGELOG.md) for the Chinese source-publication
+notes and the recent display fixes.
 
 ## At a Glance
 

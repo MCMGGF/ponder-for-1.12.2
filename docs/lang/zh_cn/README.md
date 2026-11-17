@@ -9,11 +9,14 @@
 
 ## 当前状态
 
-当前源码版本为 **0.3.7-beta**，位于目标仓库的 `cleanroom/0.3.x` 分支。
-构建与客户端运行使用 Java 25。该版本同步既有本地 Cleanroom 回移源码，并包含
-Actinium 演示空白修复、已核对的石油线基线与明确错误提示；详见
-[中文更新说明](../../../CHANGELOG.md)。仓库 `main` 的 Java 8 / Forge
-`1.3.0-alpha.1` 为独立实现，其接口、场景格式与联机能力不能直接套用到本分支。
+仓库的 `main` 分支维护 Cleanroom `0.3.x-beta` 系列，当前源码版本为
+**0.3.7-beta**。构建与客户端运行使用 Java 25。该版本同步既有本地 Cleanroom
+回移源码，并包含 Actinium 演示空白修复、已核对的石油线基线与明确错误提示。
+详见[中文更新说明](../../../CHANGELOG.md)。
+
+原 `main` 上的 Java 8 / Forge `1.3.0-alpha.1` 独立实现保存在
+[`codex/forge-1.3.x`](https://github.com/MCMGGF/ponder-for-1.12.2/tree/codex/forge-1.3.x)。
+两套实现各有自己的 API、JSON 场景格式和联机支持范围。
 
 这个项目已经可用，但仍处在持续回移与稳定化阶段。
 
