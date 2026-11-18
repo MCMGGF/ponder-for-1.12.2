@@ -12,10 +12,17 @@ import net.createmod.ponder.api.client.PonderLessonPractice;
 import net.createmod.ponder.api.registration.PonderPlugin;
 import net.createmod.ponder.foundation.PonderIndex;
 import net.createmod.ponder.foundation.content.MmcePonderPlugin;
+import net.minecraft.init.Bootstrap;
 import net.minecraft.util.ResourceLocation;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 class OilLinePracticeEntryTest {
+    @BeforeAll
+    static void bootstrap() {
+        Bootstrap.register();
+    }
+
     @Test void addonRunsAfterTheMachinePluginAndKeepsTheOriginalNamespace() {
         PonderPlugin oil = new OilProductionLinePlugin();
         PonderPlugin machines = new MmcePonderPlugin();

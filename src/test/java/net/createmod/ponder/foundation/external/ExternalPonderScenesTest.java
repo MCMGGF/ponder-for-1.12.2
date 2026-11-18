@@ -13,7 +13,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -39,10 +41,12 @@ import net.createmod.ponder.foundation.registration.PonderTagRegistry;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraftforge.fml.common.Loader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class ExternalPonderScenesTest {
 
@@ -679,21 +683,47 @@ class ExternalPonderScenesTest {
     }
 
     @Test
-    void migratedZenScriptLoaderTargetRegistersTheIndexTagAndGuideScene() throws IOException {
-        Path scripts = Paths.get("examples", "zenscript", "scripts");
-        Path entry = scripts.resolve("ponder/zen_diagnostics_entry.json");
-        String bridge = Files.readString(scripts.resolve("ponder_zen_diagnostics.zs"), StandardCharsets.UTF_8);
-        assertTrue(bridge.contains("SceneFiles.loadJson(\"scripts/ponder/zen_diagnostics_entry.json\");"));
+    @SuppressWarnings("unchecked")
+    void migratedZenScriptLoaderTargetRegistersTheIndexTagAndGuideScene(@TempDir Path gameDirectory) throws Exception {
+        Path pack = Paths.get("examples", "zenscript");
+        String relativeEntry = "scripts/ponder_migration/zen_diagnostics_entry.json";
+        String bridge = Files.readString(pack.resolve("scripts/ponder_zen_diagnostics.zs"), StandardCharsets.UTF_8);
+        assertTrue(bridge.contains("SceneFiles.loadJson(\"" + relativeEntry + "\");"));
+        Path installed = gameDirectory.resolve(relativeEntry);
+        Files.createDirectories(installed.getParent());
+        Files.copy(pack.resolve(relativeEntry), installed);
 
-        register(entry.toFile());
+        Loader loader = Loader.instance();
+        Field configDirectory = Loader.class.getDeclaredField("canonicalConfigDir");
+        configDirectory.setAccessible(true);
+        File originalConfig = loader.getConfigDir();
+        Field sources = ExternalPonderScenes.class.getDeclaredField("SCRIPT_JSON_SOURCES");
+        sources.setAccessible(true);
+        Map<String, File> queued = (Map<String, File>) sources.get(null);
+        synchronized (ExternalPonderScenes.class) {
+            Map<String, File> originalSources = new LinkedHashMap<>(queued);
+            try {
+                configDirectory.set(loader, Files.createDirectory(gameDirectory.resolve("config")).toFile());
+                ExternalPonderScenes.clearRememberedScriptJson();
+                PonderIndex.addPlugin(new ExternalPonderPlugin());
+                PonderIndex.reload();
+                assertEquals(0, entries(), "copying the files must not bypass ZenScript queueing");
 
-        PonderScene scene = programOnlyScene();
-        ResourceLocation tag = new ResourceLocation("ponder_zen", "diagnostics");
-        assertEquals(tag, PonderIndex.getTagAccess().getRegisteredTag(tag).getId());
-        assertTrue(PonderIndex.getTagAccess().getListedTags().stream().anyMatch(listed -> tag.equals(listed.getId())));
-        assertEquals("ZenScript Loader Entry", scene.getTitle());
-        assertTrue(scene.getOverlayEvents().get(0).getText().startsWith("SceneFiles loaded this entry."));
-        assertTrue(scene.isFinished());
+                ExternalPonderScenes.rememberScriptJson(relativeEntry);
+                PonderIndex.reload();
+                PonderScene scene = programOnlyScene();
+                ResourceLocation tag = new ResourceLocation("ponder_zen", "diagnostics");
+                assertEquals(tag, PonderIndex.getTagAccess().getRegisteredTag(tag).getId());
+                assertTrue(PonderIndex.getTagAccess().getListedTags().stream().anyMatch(listed -> tag.equals(listed.getId())));
+                assertEquals("ZenScript Loader Entry", scene.getTitle());
+                assertTrue(scene.getOverlayEvents().get(0).getText().startsWith("SceneFiles loaded this entry."));
+                assertTrue(scene.isFinished());
+            } finally {
+                queued.clear();
+                queued.putAll(originalSources);
+                configDirectory.set(loader, originalConfig);
+            }
+        }
     }
 
     private void register(File... files) {

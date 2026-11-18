@@ -12,8 +12,9 @@ guide.
    Ponder build that includes the CraftTweaker integration. Merge `scripts`
    into the game instance and restart the client so CraftTweaker evaluates
    `scripts/ponder_zen_diagnostics.zs`. It queues
-   `scripts/ponder/zen_diagnostics_entry.json` through
-   `mods.ponder.SceneFiles.loadJson`.
+   `scripts/ponder_migration/zen_diagnostics_entry.json` through
+   `mods.ponder.SceneFiles.loadJson`. That directory is outside Ponder’s
+   automatic JSON scan roots, so the guide appears only after the script queues it.
 3. Enter a single-player world and run `/pondereditor enable`. Run
    `/ponder reload` if the workspace was already enabled or if you edited
    the queued guide JSON. Restart the game after edits to the `.zs` file.
