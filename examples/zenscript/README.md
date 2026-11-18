@@ -52,7 +52,7 @@ each case. The codes below identify the current validation issues.
 | `90_duplicate_id.json` | `scene.id`. Two segments in the same author document use one ID. The historical case duplicated a registry scene ID in a second script. |
 | `91_missing_structure.json` | `asset.structure`. The explicitly requested `ponder_zen:missing/structure` asset is absent. |
 | `92_invalid_handle.json` | `step.invalid`. The historical bad string handle is invalid at the current numeric `actorId` entry. |
-| `93_oversized_nbt.json` | `budget.nbt`. The Tile NBT patch exceeds the current 64 KiB SNBT budget. The historical threshold was 256 KiB. |
+| `93_oversized_nbt.json` | `budget.nbt`. The Tile NBT patch exceeds the current 64 KiB UTF-8 SNBT budget with fewer than 65,536 characters. The historical threshold was 256 KiB. |
 
 The live walkthrough can also be checked with `/ponder list`,
 `/ponder compile minecraft:crafting_table` and

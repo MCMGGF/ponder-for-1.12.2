@@ -27,14 +27,11 @@ jobs:
         shell: bash
         run: chmod +x ./gradlew
 
-      - name: Test and build Cleanroom client and server shim
-        run: ./gradlew.bat test remapJar sourcesJar forgeServerShimJar --stacktrace
+      - name: Test and build the Cleanroom client, Forge shim and oil-line addon
+        run: ./gradlew.bat test remapJar sourcesJar forgeServerShimJar oilLineTest remapOilLineJar --continue --stacktrace
 
       - name: Build the migrated Java addon
         run: ./gradlew.bat -p examples/addon assemble --stacktrace
-
-      - name: Test and build the optional oil-line addon
-        run: ./gradlew.bat oilLineTest remapOilLineJar --stacktrace
 
       - name: Verify addon packaging and isolation
         shell: pwsh

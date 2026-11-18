@@ -1,6 +1,6 @@
 {
   "namespace": "ponder_zen",
-  "tags": [
+  "tagDefinitions": [
     {
       "id": "diagnostics",
       "item": "minecraft:crafting_table",

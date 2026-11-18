@@ -690,6 +690,7 @@ class ExternalPonderScenesTest {
         PonderScene scene = programOnlyScene();
         ResourceLocation tag = new ResourceLocation("ponder_zen", "diagnostics");
         assertEquals(tag, PonderIndex.getTagAccess().getRegisteredTag(tag).getId());
+        assertTrue(PonderIndex.getTagAccess().getListedTags().stream().anyMatch(listed -> tag.equals(listed.getId())));
         assertEquals("ZenScript Loader Entry", scene.getTitle());
         assertTrue(scene.getOverlayEvents().get(0).getText().startsWith("SceneFiles loaded this entry."));
         assertTrue(scene.isFinished());
