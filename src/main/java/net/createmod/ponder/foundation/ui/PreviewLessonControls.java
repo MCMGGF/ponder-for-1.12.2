@@ -14,10 +14,10 @@ final class PreviewLessonControls {
         return layout(width, height, fontHeight, false);
     }
 
-    static PreviewDebugLayout.Rect[] layout(int width, int height, int fontHeight, boolean oilPractice) {
+    static PreviewDebugLayout.Rect[] layout(int width, int height, int fontHeight, boolean practice) {
         PreviewShowcaseChromeLayout chrome = PreviewShowcaseChromeLayout.layout(width, height, fontHeight);
         int gap = 3;
-        int count = COUNT + (oilPractice ? 1 : 0);
+        int count = COUNT + (practice ? 1 : 0);
         int total = (count - 3) * 20 + 3 * 28 + (count - 1) * gap;
         int x = Math.max(0, (width - total) / 2);
         PreviewDebugLayout.Rect[] result = new PreviewDebugLayout.Rect[count];

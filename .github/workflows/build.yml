@@ -30,6 +30,57 @@ jobs:
       - name: Test and build Cleanroom client and server shim
         run: ./gradlew.bat test remapJar sourcesJar forgeServerShimJar --stacktrace
 
+      - name: Build the migrated Java addon
+        run: ./gradlew.bat -p examples/addon assemble --stacktrace
+
+      - name: Test and build the optional oil-line addon
+        run: ./gradlew.bat oilLineTest remapOilLineJar --stacktrace
+
+      - name: Verify addon packaging and isolation
+        shell: pwsh
+        run: |
+          function Read-JarEntries([string]$pattern) {
+            $jars = @(Get-ChildItem -Path $pattern -File)
+            if ($jars.Count -ne 1) { throw "Expected one archive matching $pattern" }
+            $archive = [IO.Compression.ZipFile]::OpenRead($jars[0].FullName)
+            try { $archive.Entries.FullName } finally { $archive.Dispose() }
+          }
+
+          $coreJars = @(Get-ChildItem -Path 'build/libs/ponder_legacy-*.jar' -File |
+            Where-Object Name -NotMatch '-(dev|sources|forge-server-shim|shadow)\.jar$')
+          if ($coreJars.Count -ne 1) { throw 'Expected one production Cleanroom client archive' }
+          $core = Read-JarEntries $coreJars[0].FullName
+          $shim = Read-JarEntries 'build/libs/ponder_legacy-*-forge-server-shim.jar'
+          $oil = Read-JarEntries 'build/optional-libs/ponder_early_oil_line-*.jar'
+          $example = Read-JarEntries 'examples/addon/build/libs/ponder_example-1.0.0.jar'
+          if (($core + $shim) -match '(OilLine|OilProductionLine|EarlyOilLineMod).*\.class$') {
+            throw 'Found oil-line classes in the general client or server shim'
+          }
+          if ($shim -match '^net/createmod/ponder/api/client/') {
+            throw 'Found client-only practice API in the server shim'
+          }
+          if ('net/createmod/ponder/compat/crafttweaker/PonderSceneFilesCrT.class' -notin $core -or
+              $core -match '^(crafttweaker|stanhebben/zenscript)/') {
+            throw 'Expected the optional ZenScript bridge without any bundled CraftTweaker dependencies'
+          }
+          if (-not ($oil -match '/EarlyOilLineMod\.class$') -or -not ($oil -match '/OilProductionLineScenes\.class$')) {
+            throw 'Oil-line addon is missing its entrypoint or showcase implementation'
+          }
+          if (($oil + $example) -contains 'net/createmod/ponder/Ponder.class') {
+            throw 'An addon bundled Ponder core classes'
+          }
+          if ('com/example/ponderaddon/ExampleAddon.class' -notin $example -or
+              'assets/ponder_example/ponder/codec_demo.nbt' -notin $example) {
+            throw 'Migrated Java addon is missing its entrypoint or structure'
+          }
+
+      - name: Package the migrated scene examples
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build/migration | Out-Null
+          Compress-Archive -Path 'examples/json/*' -DestinationPath build/migration/ponder-json-examples.zip
+          Compress-Archive -Path 'examples/zenscript/*' -DestinationPath build/migration/ponder-zenscript-examples.zip
+
       - name: Verify repository routing during Forge outages
         run: python scripts/test-repository-routing.py --work-dir "${{ runner.temp }}/ponder-repository-routing"
 
@@ -40,6 +91,22 @@ jobs:
           path: build/libs/*.jar
           if-no-files-found: error
 
+      - name: Upload the migrated examples
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanroom-migrated-examples
+          path: |
+            build/migration/*.zip
+            examples/addon/build/libs/ponder_example-1.0.0.jar
+          if-no-files-found: error
+
+      - name: Upload the optional oil-line addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanroom-optional-oil-line
+          path: build/optional-libs/*.jar
+          if-no-files-found: error
+
       - name: Upload build and repository diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,6 +115,7 @@ jobs:
           path: |
             build/reports/tests/
             build/test-results/
+            examples/addon/build/reports/
             ${{ runner.temp }}/ponder-repository-routing/**/gradle.log
             ${{ runner.temp }}/ponder-repository-routing/**/requests.json
           if-no-files-found: warn

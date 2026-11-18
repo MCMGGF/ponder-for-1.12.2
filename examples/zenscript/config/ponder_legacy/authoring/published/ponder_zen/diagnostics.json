@@ -1,0 +1,355 @@
+{
+  "formatVersion": 1,
+  "targetVersion": "1.12.2",
+  "source": {
+    "dialect": "forge-zenscript",
+    "originalId": "ponder_zen:diagnostics_demo"
+  },
+  "id": "ponder_zen:diagnostics",
+  "items": [
+    "minecraft:crafting_table"
+  ],
+  "structure": "ponder:demo/basics",
+  "sharedTexts": {
+    "ponder:ponder_zen.step.1": "Step 1: Reveal the external NBT structure",
+    "ponder:ponder_zen.step.2": "Step 2: Move a typed section handle",
+    "ponder:ponder_zen.step.3": "Step 3: Create and move an item entity handle"
+  },
+  "scenes": [
+    {
+      "id": "diagnostics_demo",
+      "title": "Ponder ZenScript Diagnostics",
+      "autoReveal": false,
+      "autoKeyframes": false,
+      "view": {
+        "baseX": 0,
+        "baseZ": 0,
+        "baseSize": 5,
+        "hideShadow": false
+      },
+      "steps": [
+        {
+          "type": "show_structure",
+          "blockPos": [
+            0,
+            0,
+            0
+          ],
+          "blockPos2": [
+            4,
+            0,
+            4
+          ],
+          "direction": "up",
+          "fadeDuration": 15
+        },
+        {
+          "type": "idle",
+          "duration": 10
+        },
+        {
+          "type": "show_structure",
+          "blockPos": [
+            0,
+            1,
+            0
+          ],
+          "blockPos2": [
+            4,
+            2,
+            4
+          ],
+          "direction": "down",
+          "fadeDuration": 15
+        },
+        {
+          "type": "idle",
+          "duration": 20
+        },
+        {
+          "type": "native_point_of_interest",
+          "point": [
+            2.5,
+            1.5,
+            2.5
+          ]
+        },
+        {
+          "type": "shared_text",
+          "key": "ponder:ponder_zen.step.1",
+          "duration": 100,
+          "point": [
+            2.5,
+            2,
+            2.5
+          ],
+          "pointSpace": "scene",
+          "color": "white",
+          "placeNearTarget": true
+        },
+        {
+          "type": "highlight_section",
+          "blockPos": [
+            0,
+            1,
+            0
+          ],
+          "blockPos2": [
+            4,
+            2,
+            4
+          ],
+          "color": "blue",
+          "chasing": false,
+          "duration": 80
+        },
+        {
+          "type": "text",
+          "blockPos": [
+            0,
+            1,
+            0
+          ],
+          "blockPos2": [
+            4,
+            2,
+            4
+          ],
+          "text": "The loaded demo structure",
+          "color": "blue",
+          "duration": 80
+        },
+        {
+          "type": "keyframe"
+        },
+        {
+          "type": "idle",
+          "duration": 100
+        },
+        {
+          "type": "modify_block_entity_nbt",
+          "blockPos": [
+            3,
+            1,
+            2
+          ],
+          "nbt": "{Lock:\"ponder_zen_demo\"}",
+          "nbtMode": "merge",
+          "reDrawBlocks": false
+        },
+        {
+          "type": "show_controls",
+          "duration": 80,
+          "point": [
+            3.5,
+            1.5,
+            2.5
+          ],
+          "pointSpace": "scene",
+          "direction": "down",
+          "action": "right",
+          "item": "minecraft:chest"
+        },
+        {
+          "type": "native_overlay",
+          "nativeVersion": 1,
+          "overlay": {
+            "originalType": "SCENE_OUTLINE",
+            "duration": 80,
+            "color": "green",
+            "bounds": [
+              2,
+              1,
+              2,
+              4,
+              2,
+              3
+            ],
+            "overlayId": "chest_bounds"
+          }
+        },
+        {
+          "type": "idle",
+          "duration": 90
+        },
+        {
+          "type": "show_structure",
+          "blockPos": [
+            3,
+            1,
+            2
+          ],
+          "linkId": "chest_section",
+          "directionless": true,
+          "fadeDuration": 0
+        },
+        {
+          "type": "move_section",
+          "linkId": "chest_section",
+          "offset": [
+            0,
+            1,
+            0
+          ],
+          "duration": 20
+        },
+        {
+          "type": "rotate_section",
+          "linkId": "chest_section",
+          "rotY": 90,
+          "duration": 20
+        },
+        {
+          "type": "shared_text",
+          "key": "ponder:ponder_zen.step.2",
+          "duration": 100,
+          "point": [
+            3.5,
+            2.5,
+            2.5
+          ],
+          "pointSpace": "scene",
+          "color": "blue",
+          "placeNearTarget": true
+        },
+        {
+          "type": "native_overlay",
+          "nativeVersion": 1,
+          "overlay": {
+            "originalType": "SCENE_LINE",
+            "duration": 60,
+            "color": "red",
+            "lineStart": [
+              2.5,
+              1,
+              2.5
+            ],
+            "lineEnd": [
+              3.5,
+              2,
+              2.5
+            ],
+            "lineWide": true
+          }
+        },
+        {
+          "type": "keyframe"
+        },
+        {
+          "type": "idle",
+          "duration": 110
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "SPAWN",
+          "pos": [
+            2.5,
+            2.2,
+            2.5
+          ],
+          "item": "minecraft:book",
+          "count": 1,
+          "meta": 0
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "MOVE",
+          "offset": [
+            0,
+            0.58,
+            0
+          ],
+          "duration": 20,
+          "walkAnimation": false
+        },
+        {
+          "type": "shared_text",
+          "key": "ponder:ponder_zen.step.3",
+          "duration": 100,
+          "point": [
+            2.5,
+            2,
+            2.5
+          ],
+          "pointSpace": "scene",
+          "color": "green",
+          "placeNearTarget": true
+        },
+        {
+          "type": "show_controls",
+          "duration": 60,
+          "point": [
+            3.5,
+            2,
+            2.5
+          ],
+          "pointSpace": "scene",
+          "direction": "up",
+          "action": "scroll"
+        },
+        {
+          "type": "indicate_success",
+          "blockPos": [
+            3,
+            1,
+            2
+          ]
+        },
+        {
+          "type": "keyframe"
+        },
+        {
+          "type": "idle",
+          "duration": 100
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "NBT_PATCH",
+          "nbt": "{Invisible:1b}"
+        },
+        {
+          "type": "idle",
+          "duration": 20
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "NBT_PATCH",
+          "nbt": "{Invisible:0b}"
+        },
+        {
+          "type": "idle",
+          "duration": 10
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "HIDE",
+          "duration": 0
+        },
+        {
+          "type": "hide_section",
+          "blockPos": [
+            3,
+            1,
+            2
+          ],
+          "direction": "up",
+          "fadeDuration": 15
+        },
+        {
+          "type": "idle",
+          "duration": 20
+        }
+      ]
+    }
+  ]
+}

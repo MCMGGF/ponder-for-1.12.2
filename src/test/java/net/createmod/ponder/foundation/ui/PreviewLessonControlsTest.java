@@ -5,7 +5,7 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 class PreviewLessonControlsTest {
-    @Test void oilPracticeFitsWithoutRemovingAnyPlaybackOrSkinControls() {
+    @Test void optionalPracticeFitsWithoutRemovingAnyPlaybackOrSkinControls() {
         for (int width : new int[] {320, 427, 640, 960, 1920}) {
             for (int font : new int[] {9, 18, 24}) {
                 PreviewDebugLayout.Rect[] buttons = PreviewLessonControls.layout(width, 240, font, true);

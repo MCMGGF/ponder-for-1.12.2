@@ -1,0 +1,9 @@
+[
+  {
+    "modid": "ponder_example",
+    "name": "Ponder Example Addon",
+    "description": "Three Ponder scenes for Minecraft 1.12.2 Cleanroom clients.",
+    "version": "1.0.0",
+    "mcversion": "1.12.2"
+  }
+]

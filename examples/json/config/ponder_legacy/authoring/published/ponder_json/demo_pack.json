@@ -1,0 +1,209 @@
+{
+  "formatVersion": 1,
+  "targetVersion": "1.12.2",
+  "source": {
+    "dialect": "forge-ponder-pack-v1",
+    "originalId": "ponder_json:crafting_demo"
+  },
+  "id": "ponder_json:demo_pack",
+  "items": [
+    "minecraft:crafting_table"
+  ],
+  "structure": "ponder:demo/basics",
+  "sharedTexts": {
+    "ponder_json:step": "JSON step: handles and SNBT"
+  },
+  "scenes": [
+    {
+      "id": "crafting_demo",
+      "title": "Reloadable JSON Scene",
+      "autoReveal": false,
+      "autoKeyframes": false,
+      "view": {
+        "baseX": 0,
+        "baseZ": 0,
+        "baseSize": 5,
+        "hideShadow": false
+      },
+      "steps": [
+        {
+          "type": "show_structure",
+          "blockPos": [
+            0,
+            0,
+            0
+          ],
+          "blockPos2": [
+            4,
+            0,
+            4
+          ],
+          "direction": "up",
+          "fadeDuration": 15
+        },
+        {
+          "type": "idle",
+          "duration": 10
+        },
+        {
+          "type": "show_structure",
+          "blockPos": [
+            0,
+            1,
+            0
+          ],
+          "blockPos2": [
+            4,
+            2,
+            4
+          ],
+          "direction": "down",
+          "fadeDuration": 15
+        },
+        {
+          "type": "show_structure",
+          "blockPos": [
+            2,
+            1,
+            2
+          ],
+          "linkId": "demo_section",
+          "direction": "up",
+          "fadeDuration": 15
+        },
+        {
+          "type": "move_section",
+          "linkId": "demo_section",
+          "offset": [
+            0,
+            1,
+            0
+          ],
+          "duration": 20
+        },
+        {
+          "type": "modify_block_entity_nbt",
+          "blockPos": [
+            3,
+            1,
+            2
+          ],
+          "nbt": "{Lock:\"ponder_json\"}",
+          "nbtMode": "merge",
+          "reDrawBlocks": true
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "SPAWN",
+          "pos": [
+            2.5,
+            2.25,
+            2.5
+          ],
+          "item": "minecraft:paper",
+          "count": 1,
+          "meta": 0
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "MOVE",
+          "offset": [
+            1,
+            0.32,
+            0
+          ],
+          "duration": 20,
+          "walkAnimation": false
+        },
+        {
+          "type": "idle",
+          "duration": 20
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "NBT_PATCH",
+          "nbt": "{Invisible:1b}"
+        },
+        {
+          "type": "idle",
+          "duration": 5
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "NBT_PATCH",
+          "nbt": "{Invisible:0b}"
+        },
+        {
+          "type": "shared_text",
+          "key": "ponder_json:step",
+          "duration": 60,
+          "point": [
+            2.5,
+            2.5,
+            2.5
+          ],
+          "pointSpace": "scene",
+          "color": "white",
+          "placeNearTarget": true
+        },
+        {
+          "type": "keyframe"
+        },
+        {
+          "type": "show_controls",
+          "duration": 40,
+          "point": [
+            2.5,
+            2.25,
+            2.5
+          ],
+          "pointSpace": "scene",
+          "direction": "down",
+          "action": "right",
+          "item": "minecraft:paper"
+        },
+        {
+          "type": "indicate_success",
+          "blockPos": [
+            2,
+            1,
+            2
+          ]
+        },
+        {
+          "type": "idle",
+          "duration": 60
+        },
+        {
+          "type": "actor_action",
+          "kind": "ITEM",
+          "actorId": 1,
+          "action": "HIDE",
+          "duration": 0
+        },
+        {
+          "type": "hide_section",
+          "blockPos": [
+            2,
+            1,
+            2
+          ],
+          "direction": "up",
+          "fadeDuration": 15
+        },
+        {
+          "type": "idle",
+          "duration": 15
+        }
+      ]
+    }
+  ]
+}

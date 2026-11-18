@@ -15,6 +15,17 @@ repositories {
         name = 'Modrinth'
         url = 'https://api.modrinth.com/maven'
     }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'BlameJared'
+                url = 'https://maven.blamejared.com/'
+            }
+        }
+        filter {
+            includeGroup('CraftTweaker2')
+        }
+    }
     mavenCentral()
     mavenLocal() // Must be last for caching to work
 }

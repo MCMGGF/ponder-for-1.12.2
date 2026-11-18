@@ -7,6 +7,11 @@ public interface PonderPlugin {
 
     String getModId();
 
+    /** Override when moving existing content whose public IDs must retain their original namespace. */
+    default String getRegistrationNamespace() {
+        return getModId();
+    }
+
     default void registerScenes(PonderSceneRegistrationHelper<ResourceLocation> helper) {
     }
 

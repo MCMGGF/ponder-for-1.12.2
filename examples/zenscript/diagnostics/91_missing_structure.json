@@ -1,0 +1,33 @@
+{
+  "formatVersion": 1,
+  "targetVersion": "1.12.2",
+  "source": {
+    "dialect": "forge-zenscript",
+    "originalId": "ponder_zen:diagnostics_demo"
+  },
+  "id": "ponder_zen:missing_structure",
+  "items": [
+    "minecraft:crafting_table"
+  ],
+  "structure": "ponder_zen:missing/structure",
+  "scenes": [
+    {
+      "id": "diagnostic",
+      "title": "Missing External Structure",
+      "autoReveal": false,
+      "autoKeyframes": false,
+      "view": {
+        "baseX": 0,
+        "baseZ": 0,
+        "baseSize": 5,
+        "hideShadow": false
+      },
+      "steps": [
+        {
+          "type": "idle",
+          "duration": 1
+        }
+      ]
+    }
+  ]
+}

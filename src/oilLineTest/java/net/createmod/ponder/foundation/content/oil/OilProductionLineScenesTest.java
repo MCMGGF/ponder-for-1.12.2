@@ -258,7 +258,7 @@ class OilProductionLineScenesTest {
     void teachingSourceUsesOnlyDetachedInstructionsNotRealWorldOrNetworkInteraction() throws IOException {
         for (String file : Arrays.asList("OilProductionLineScenes.java", "OilProductionLinePlugin.java")) {
             String source = new String(Files.readAllBytes(Paths.get(
-                "src/main/java/net/createmod/ponder/foundation/content/oil", file)), StandardCharsets.UTF_8);
+                "src/oilLine/java/net/createmod/ponder/foundation/content/oil", file)), StandardCharsets.UTF_8);
             for (String forbidden : Arrays.asList("Minecraft.getMinecraft", "playerController", "sendToServer",
                 "getConnection()", "WorldServer", "WorldClient", ".setBlockState(", ".openGui(",
                 ".onBlockActivated(", "processRightClick", "CPacket", "SimpleNetworkWrapper")) {

@@ -103,6 +103,6 @@ class OilLineControlScreenTest {
 
     private static void press(OilLineControlScreen screen, int id) { screen.actionPerformed(new GuiButton(id, 0, 0, "")); }
     private static String source() throws Exception {
-        return new String(Files.readAllBytes(Paths.get("src/main/java/net/createmod/ponder/foundation/ui/OilLineControlScreen.java")), StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(Paths.get("src/oilLine/java/net/createmod/ponder/foundation/ui/OilLineControlScreen.java")), StandardCharsets.UTF_8);
     }
 }

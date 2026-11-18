@@ -39,8 +39,6 @@ notes and the recent display fixes.
 - a local Ponderer-style editor, blueprint capture, structure/image assets, bounded package exchange and offline generation import
 - preview-only player actions, three-dimensional block outlines and foreground target callouts
 - miniature/full-scale projectors and explicitly isolated vanilla menu practice
-- a six-chapter, pack-specific early petroleum line with real structure snapshots,
-  separate conduits, batch storage, player actions and throughput troubleshooting
 
 Local visual authoring is off by default. Run `/pondereditor enable` to enable it,
 then use `/pondereditor` in a singleplayer world. See
@@ -50,12 +48,11 @@ in an existing instance; use that instance's installation receipt and actual JAR
 The `0.3.2-beta` reading-layer change is documented in
 [the reading-layer notes](docs/READING_LAYER_032.md). Native acceptance and installation
 are not implied by a source version or passing unit tests.
-The new oil-line entry and its deliberately semi-automatic startup/storage procedure
-are documented in [the oil-line guide](docs/EARLY_OIL_LINE_033.md).
-The oil lessons now also expose an isolated operating exercise through the book
-button, with resource ledgers, station controls, safe-start goals and fault
-feedback. See [the operating-practice guide](docs/OIL_OPERATING_PRACTICE_034.md).
-This is a local teaching model, not a live MMCE container or pipe-network emulator.
+
+The six-chapter Airship Workshop petroleum line and its operating exercise are
+available as a separate addon for the matching modpack. See the
+[oil-line installation guide](docs/EARLY_OIL_LINE_033.md) and the
+[operating-practice guide](docs/OIL_OPERATING_PRACTICE_034.md).
 
 ## Current Constraints
 
@@ -84,6 +81,12 @@ against this candidate's own JAR hash rather than inherited from an Alpha run.
 
 - [English example index](docs/examples/json_tutorial/lang/en_us/README.md)
 - [中文示例索引](docs/examples/json_tutorial/lang/zh_cn/README.md)
+
+### Examples migrated from Forge 1.3
+
+- [JSON scene pack](examples/json/README.md)
+- [ZenScript loader and migrated diagnostics scene](examples/zenscript/README.md)
+- [Java addon](examples/addon/README.md)
 
 ### Wiki
 

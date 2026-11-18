@@ -59,6 +59,37 @@ configurations {
     runtimeOnly.extendsFrom(modRuntimeOnly)
 }
 
+sourceSets {
+    oilLine {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+    }
+    oilLineTest {
+        compileClasspath += sourceSets.main.output + sourceSets.oilLine.output
+        runtimeClasspath += sourceSets.main.output + sourceSets.oilLine.output
+    }
+}
+
+configurations {
+    oilLineTestImplementation.extendsFrom(testImplementation)
+    oilLineTestRuntimeOnly.extendsFrom(testRuntimeOnly)
+}
+
+def oilLineJar = tasks.register('oilLineJar', Jar) {
+    group = 'build'
+    description = 'Packages the optional early oil line addon in the development namespace.'
+    from sourceSets.oilLine.output
+    from(project.files('LICENSE', 'NOTICE.md')) {
+        into 'META-INF'
+    }
+    archiveBaseName = 'ponder_early_oil_line'
+    archiveVersion = project.version
+    archiveClassifier = 'dev'
+    destinationDirectory = layout.buildDirectory.dir('dev-libs')
+    manifest {
+        attributes('ModType': 'CRL')
+    }
+}
+
 String remapTaskName = propertyBool('enable_shadow') ? 'remapShadowJar' : 'remapJar'
 
 unimined.minecraft {
@@ -100,6 +131,12 @@ unimined.minecraft {
             disableRefmap()
         }
     }
+    remap(oilLineJar.get(), 'remapOilLineJar') {
+        archiveBaseName = 'ponder_early_oil_line'
+        archiveVersion = project.version
+        archiveClassifier = ''
+        destinationDirectory = project.layout.buildDirectory.dir('optional-libs')
+    }
 
     mods {
         remap(configurations.modCompileOnly)
@@ -118,35 +155,12 @@ dependencies {
         testImplementation sourceSets.main.compileClasspath
     }
 
-    def craftTweakerCacheRoot = new File(System.getProperty('user.home'),
-        '.gradle/caches/modules-2/files-2.1/CraftTweaker2')
-    def craftTweakerJars = fileTree('libs/api') {
-        include 'CraftTweaker2-*.jar'
+    // Compile the optional SceneFiles bridge consistently on clean checkouts.
+    compileOnly('CraftTweaker2:CraftTweaker2-API:4.1.20.698') {
+        transitive = false
     }
-    if (craftTweakerJars.isEmpty() && craftTweakerCacheRoot.exists()) {
-        craftTweakerJars = fileTree(craftTweakerCacheRoot) {
-            include '**/CraftTweaker2-API-*.jar'
-            include '**/CraftTweaker2-MC1120-Main-*.jar'
-            include '**/ZenScript-*.jar'
-            exclude '**/*-sources.jar'
-        }
-    }
-
-    project.ext.hasCraftTweakerIntegration = !craftTweakerJars.isEmpty()
-    if (project.ext.hasCraftTweakerIntegration) {
-        compileOnly craftTweakerJars
-    } else {
-        logger.lifecycle('CraftTweaker integration jars were not found in local Gradle cache; zs bridge sources will be excluded from compilation.')
-    }
-}
-
-if (!(project.ext.has('hasCraftTweakerIntegration') && project.ext.hasCraftTweakerIntegration)) {
-    sourceSets {
-        main {
-            java {
-                exclude 'net/createmod/ponder/compat/crafttweaker/**'
-            }
-        }
+    compileOnly('CraftTweaker2:ZenScript:4.1.20.698') {
+        transitive = false
     }
 }
 
@@ -227,6 +241,7 @@ tasks.register('compileForgeServerShimJava', JavaCompile) {
     source fileTree('src/main/java') {
         include 'net/createmod/catnip/math/**/*.java'
         include 'net/createmod/ponder/api/**/*.java'
+        exclude 'net/createmod/ponder/api/client/**'
     }
     sourceCompatibility = targetCompatibility = JavaVersion.VERSION_1_8
     options.release = 8
@@ -305,6 +320,14 @@ compileJava {
     options.release = 25
 }
 
+tasks.named('compileOilLineJava', JavaCompile) {
+    options.release = 25
+}
+
+tasks.named('compileOilLineTestJava', JavaCompile) {
+    options.release = 25
+}
+
 jar {
     archiveClassifier = 'dev'
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -378,6 +401,17 @@ test {
             showStandardStreams = true
         }
     }
+}
+
+tasks.register('oilLineTest', Test) {
+    group = 'verification'
+    description = 'Runs the optional early oil line addon tests.'
+    testClassesDirs = sourceSets.oilLineTest.output.classesDirs
+    classpath = sourceSets.oilLineTest.runtimeClasspath
+    useJUnitPlatform()
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    })
 }
 
 tasks.withType(JavaCompile).configureEach {

@@ -1,0 +1,51 @@
+{
+  "formatVersion": 1,
+  "targetVersion": "1.12.2",
+  "source": {
+    "dialect": "forge-zenscript",
+    "originalId": "ponder_zen:diagnostics_demo"
+  },
+  "id": "ponder_zen:negative_duplicate_id",
+  "items": [
+    "minecraft:crafting_table"
+  ],
+  "structure": "ponder:demo/basics",
+  "scenes": [
+    {
+      "id": "diagnostic",
+      "title": "Duplicate Scene ID",
+      "autoReveal": false,
+      "autoKeyframes": false,
+      "view": {
+        "baseX": 0,
+        "baseZ": 0,
+        "baseSize": 5,
+        "hideShadow": false
+      },
+      "steps": [
+        {
+          "type": "idle",
+          "duration": 1
+        }
+      ]
+    },
+    {
+      "id": "diagnostic",
+      "title": "Duplicate Scene ID",
+      "autoReveal": false,
+      "autoKeyframes": false,
+      "view": {
+        "baseX": 0,
+        "baseZ": 0,
+        "baseSize": 5,
+        "hideShadow": false
+      },
+      "steps": [
+        {
+          "type": "idle",
+          "duration": 1
+        }
+      ]
+    }
+  ]
+}

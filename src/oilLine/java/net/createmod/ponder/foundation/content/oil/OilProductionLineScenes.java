@@ -66,7 +66,7 @@ public final class OilProductionLineScenes {
         } catch (IllegalStateException failure) {
             reportAssetFailure(failure);
             scene.getScene().setSchematic(PonderSchematic.empty());
-            scene.title("production/early_oil/" + OilProductionLinePlugin.CHAPTERS.get(chapter), TITLES[chapter]);
+            scene.title(OilProductionLinePlugin.scenePath(OilProductionLinePlugin.CHAPTERS.get(chapter)), TITLES[chapter]);
             scene.overlay().showText(240).colored(PonderPalette.RED)
                 .text("本实例的石油线资料不完整，未替换成虚构机器：" + failure.getMessage());
             scene.idle(240);
@@ -87,7 +87,7 @@ public final class OilProductionLineScenes {
     static void build(SceneBuilder scene, SceneBuildingUtil util, int chapter, Assets assets) {
         checkChapter(chapter);
         scene.getScene().setSchematic(PonderSchematic.empty());
-        scene.title("production/early_oil/" + OilProductionLinePlugin.CHAPTERS.get(chapter), TITLES[chapter]);
+        scene.title(OilProductionLinePlugin.scenePath(OilProductionLinePlugin.CHAPTERS.get(chapter)), TITLES[chapter]);
         scene.removeShadow();
         Context c = new Context(scene, util, assets, chapter);
         c.plant();

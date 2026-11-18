@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import javax.annotation.Nullable;
 
 import net.createmod.ponder.Ponder;
+import net.createmod.ponder.api.client.PonderLessonPractice;
 import net.createmod.ponder.authoring.AuthoringSettings;
 import net.createmod.ponder.foundation.PonderScene;
 import net.createmod.ponder.foundation.PonderTag;
@@ -35,8 +36,12 @@ public class PonderUI extends PonderDebugScreen {
                 return;
             }
             if (keyCode == org.lwjgl.input.Keyboard.KEY_J) {
-                if (isOilPracticeScene()) { openOilControls(); return; }
-                AuthoringEditorScreen.openPractice(this, getSelectedScene());
+                PonderLessonPractice practice = getSelectedPractice();
+                if (practice != null) {
+                    openPractice(practice);
+                } else {
+                    AuthoringEditorScreen.openPractice(this, getSelectedScene());
+                }
                 return;
             }
         }
@@ -44,9 +49,15 @@ public class PonderUI extends PonderDebugScreen {
     }
 
     private static final String UI_LANG_PREFIX = "ponder.ui.";
-    private static final int BUTTON_OIL_PRACTICE = 180;
-    private GuiButton oilPracticeButton;
-    private String oilPracticeNotice = "";
+    private static final int BUTTON_PRACTICE = 180;
+    private static final int[] TOOLBAR_IDS = { BUTTON_PREV_SCENE, BUTTON_PREV_STEP, BUTTON_PLAY_PAUSE, BUTTON_NEXT_STEP,
+        BUTTON_NEXT_SCENE, BUTTON_START, BUTTON_RESET_CAMERA, BUTTON_SKIN_CURRENT,
+        BUTTON_SKIN_STEVE, BUTTON_SKIN_ALEX, BUTTON_CLOSE };
+    private final GuiButton[] toolbarButtons = new GuiButton[TOOLBAR_IDS.length];
+    private GuiButton practiceButton;
+    private int toolbarFontHeight;
+    private ResourceLocation practiceNoticeScene;
+    private String practiceNotice = "";
     private boolean vanillaTutorialsOnly;
     private ItemStack sourceStack = ItemStack.EMPTY;
     private ResourceLocation stackComponent;
@@ -151,22 +162,21 @@ public class PonderUI extends PonderDebugScreen {
     @Override
     protected void initShowcaseButtons() {
         clearChromeDrawRecord();
-        PreviewDebugLayout.Rect[] slots = PreviewLessonControls.layout(width, height, getShowcaseChromeLayout().fontHeight);
-        int[] ids = { BUTTON_PREV_SCENE, BUTTON_PREV_STEP, BUTTON_PLAY_PAUSE, BUTTON_NEXT_STEP,
-            BUTTON_NEXT_SCENE, BUTTON_START, BUTTON_RESET_CAMERA, BUTTON_SKIN_CURRENT,
-            BUTTON_SKIN_STEVE, BUTTON_SKIN_ALEX, BUTTON_CLOSE };
+        toolbarFontHeight = getShowcaseChromeLayout().fontHeight;
+        PreviewDebugLayout.Rect[] slots = PreviewLessonControls.layout(width, height, toolbarFontHeight);
         String[] labels = { "<<", "|<", "||", ">|", ">>", "R", "C", tr("skin.current_short"), "S", "A", "X" };
-        for (int i = 0; i < ids.length; i++) {
+        for (int i = 0; i < TOOLBAR_IDS.length; i++) {
             PreviewDebugLayout.Rect slot = slots[i];
-            GuiButton button = new GuiButton(ids[i], slot.x, slot.y, slot.width, slot.height, labels[i]);
-            if (ids[i] == BUTTON_PREV_SCENE) prevSceneButton = button;
-            if (ids[i] == BUTTON_NEXT_SCENE) nextSceneButton = button;
-            if (ids[i] == BUTTON_PLAY_PAUSE) playPauseButton = button;
-            if (ids[i] == BUTTON_START) startButton = button;
+            GuiButton button = new GuiButton(TOOLBAR_IDS[i], slot.x, slot.y, slot.width, slot.height, labels[i]);
+            if (button.id == BUTTON_PREV_SCENE) prevSceneButton = button;
+            if (button.id == BUTTON_NEXT_SCENE) nextSceneButton = button;
+            if (button.id == BUTTON_PLAY_PAUSE) playPauseButton = button;
+            if (button.id == BUTTON_START) startButton = button;
+            toolbarButtons[i] = button;
             addCompatButton(button);
         }
-        oilPracticeButton = new OilPracticeButton(BUTTON_OIL_PRACTICE);
-        addCompatButton(oilPracticeButton);
+        practiceButton = new PracticeButton(BUTTON_PRACTICE);
+        addCompatButton(practiceButton);
         playing = true;
     }
 
@@ -176,61 +186,87 @@ public class PonderUI extends PonderDebugScreen {
         if (playPauseButton != null) {
             playPauseButton.displayString = isPlaybackRunning() ? "||" : ">";
         }
-        if (oilPracticeButton != null) {
-            boolean oil = isOilPracticeScene();
-            oilPracticeButton.visible = oil;
-            oilPracticeButton.enabled = oil;
-            if (!oil) oilPracticeNotice = "";
-            PreviewDebugLayout.Rect[] slots = PreviewLessonControls.layout(width, height,
-                getShowcaseChromeLayout().fontHeight, oil);
-            int[] ids = { BUTTON_PREV_SCENE, BUTTON_PREV_STEP, BUTTON_PLAY_PAUSE, BUTTON_NEXT_STEP,
-                BUTTON_NEXT_SCENE, BUTTON_START, BUTTON_RESET_CAMERA, BUTTON_SKIN_CURRENT,
-                BUTTON_SKIN_STEVE, BUTTON_SKIN_ALEX, BUTTON_CLOSE };
-            for (GuiButton button : buttonList) {
-                int index = -1;
-                for (int i = 0; i < ids.length; i++) if (button.id == ids[i]) index = i;
-                if (index == 10 && oil) index = 11;
-                if (button.id == BUTTON_OIL_PRACTICE && oil) index = 10;
-                if (index >= 0) {
-                    PreviewDebugLayout.Rect slot = slots[index];
-                    button.x = slot.x; button.y = slot.y; button.width = slot.width; button.height = slot.height;
-                }
+        if (practiceButton == null) {
+            return;
+        }
+        ResourceLocation sceneId = getSelectedSceneId();
+        PonderLessonPractice practice = PonderLessonPractice.find(sceneId);
+        boolean hasPractice = practice != null;
+        if (!hasPractice || !java.util.Objects.equals(practiceNoticeScene, sceneId)) {
+            practiceNotice = "";
+        }
+        practiceButton.displayString = hasPractice ? practice.getTitle() : "";
+        int fontHeight = getShowcaseChromeLayout().fontHeight;
+        if (practiceButton.visible != hasPractice || toolbarFontHeight != fontHeight) {
+            practiceButton.visible = hasPractice;
+            practiceButton.enabled = hasPractice;
+            toolbarFontHeight = fontHeight;
+            PreviewDebugLayout.Rect[] slots = PreviewLessonControls.layout(width, height, fontHeight, hasPractice);
+            int closeIndex = TOOLBAR_IDS.length - 1;
+            for (int i = 0; i < closeIndex; i++) {
+                placeToolbarButton(toolbarButtons[i], slots[i]);
+            }
+            placeToolbarButton(toolbarButtons[closeIndex], slots[slots.length - 1]);
+            if (hasPractice) {
+                placeToolbarButton(practiceButton, slots[closeIndex]);
             }
         }
     }
 
-    private boolean isOilPracticeScene() {
-        return getSelectedScene() != null && OilLinePracticeEntry.matches(getSelectedScene().getSceneId());
+    private static void placeToolbarButton(GuiButton button, PreviewDebugLayout.Rect slot) {
+        button.x = slot.x;
+        button.y = slot.y;
+        button.width = slot.width;
+        button.height = slot.height;
     }
 
-    private void openOilControls() {
-        if (!isOilPracticeScene()) return;
+    @Nullable
+    private ResourceLocation getSelectedSceneId() {
+        PonderScene scene = getSelectedScene();
+        return scene == null ? null : scene.getSceneId();
+    }
+
+    @Nullable
+    private PonderLessonPractice getSelectedPractice() {
+        return PonderLessonPractice.find(getSelectedSceneId());
+    }
+
+    private void openPractice(PonderLessonPractice practice) {
+        practiceNoticeScene = getSelectedSceneId();
         if (mc == null || !mc.isSingleplayer()) {
-            oilPracticeNotice = "操作推演暂仅开放单人模式";
+            practiceNotice = I18n.format("ponder.authoring.singleplayer");
             return;
         }
         playing = false;
         updateButtonState();
+        GuiScreen screen;
         try {
-            java.io.File config = net.minecraftforge.fml.common.Loader.instance().getConfigDir();
-            if (config == null || config.getParentFile() == null) throw new IllegalStateException("配置目录未就绪");
-            net.createmod.ponder.foundation.content.oil.OilLinePackBaseline.verify(config.getParentFile().toPath());
-            oilPracticeNotice = "";
-            mc.displayGuiScreen(new OilLineControlScreen(this));
-        } catch (IllegalStateException failure) {
-            oilPracticeNotice = "教学配置已变化，操作台暂不可用";
-            Ponder.LOGGER.warn("Cannot open the pack-specific oil operating exercise", failure);
+            screen = practice.createScreen(this);
+        } catch (RuntimeException | LinkageError failure) {
+            practiceNotice = practice.getUnavailableNotice();
+            Ponder.LOGGER.warn("Cannot open practice for scene " + practiceNoticeScene, failure);
+            return;
         }
+        practiceNotice = "";
+        mc.displayGuiScreen(screen);
     }
 
     @Override
     protected void actionPerformed(GuiButton button) throws java.io.IOException {
-        if (button.id == BUTTON_OIL_PRACTICE) { openOilControls(); return; }
+        if (button.id == BUTTON_PRACTICE) {
+            PonderLessonPractice practice = getSelectedPractice();
+            if (practice != null) openPractice(practice);
+            return;
+        }
         super.actionPerformed(button);
     }
 
-    private static final class OilPracticeButton extends GuiButton {
-        OilPracticeButton(int id) { super(id, 0, 0, 20, 20, "石油线操作推演"); }
+    private static final class PracticeButton extends GuiButton {
+        PracticeButton(int id) {
+            super(id, 0, 0, 20, 20, "");
+            visible = false;
+            enabled = false;
+        }
 
         @Override public void drawButton(net.minecraft.client.Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
             String label = displayString;
@@ -495,8 +531,8 @@ public class PonderUI extends PonderDebugScreen {
 
     @Override
     protected void drawShowcaseHoverHints(int mouseX, int mouseY) {
-        if (!oilPracticeNotice.isEmpty()) {
-            drawShowcaseCenteredHint(oilPracticeNotice, 0xFF9A86);
+        if (!practiceNotice.isEmpty()) {
+            drawShowcaseCenteredHint(practiceNotice, 0xFF9A86);
             return;
         }
         if (drawShowcaseGroupHoverHint(mouseX, mouseY)) {

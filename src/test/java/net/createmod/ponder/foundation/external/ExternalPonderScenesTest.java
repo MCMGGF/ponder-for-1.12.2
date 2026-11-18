@@ -678,6 +678,23 @@ class ExternalPonderScenesTest {
         assertEquals(Ponder.asResource("not_registered"), tags.getRegisteredTag(location("old")).getId());
     }
 
+    @Test
+    void migratedZenScriptLoaderTargetRegistersTheIndexTagAndGuideScene() throws IOException {
+        Path scripts = Paths.get("examples", "zenscript", "scripts");
+        Path entry = scripts.resolve("ponder/zen_diagnostics_entry.json");
+        String bridge = Files.readString(scripts.resolve("ponder_zen_diagnostics.zs"), StandardCharsets.UTF_8);
+        assertTrue(bridge.contains("SceneFiles.loadJson(\"scripts/ponder/zen_diagnostics_entry.json\");"));
+
+        register(entry.toFile());
+
+        PonderScene scene = programOnlyScene();
+        ResourceLocation tag = new ResourceLocation("ponder_zen", "diagnostics");
+        assertEquals(tag, PonderIndex.getTagAccess().getRegisteredTag(tag).getId());
+        assertEquals("ZenScript Loader Entry", scene.getTitle());
+        assertTrue(scene.getOverlayEvents().get(0).getText().startsWith("SceneFiles loaded this entry."));
+        assertTrue(scene.isFinished());
+    }
+
     private void register(File... files) {
         PonderIndex.addPlugin(new ExternalPonderPlugin(() -> ExternalPonderScenes.loadDefinitions(Arrays.asList(files))));
         PonderIndex.reload();

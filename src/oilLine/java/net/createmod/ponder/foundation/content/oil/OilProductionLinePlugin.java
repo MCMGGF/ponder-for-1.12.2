@@ -21,8 +21,17 @@ public final class OilProductionLinePlugin implements PonderPlugin {
     public static final List<String> CHAPTERS = java.util.Collections.unmodifiableList(Arrays.asList(
         "overview", "steam", "pumping", "distillation", "power", "troubleshooting"));
 
+    static String scenePath(String chapter) {
+        return "production/early_oil/" + chapter;
+    }
+
     @Override
     public String getModId() {
+        return EarlyOilLineMod.MOD_ID;
+    }
+
+    @Override
+    public String getRegistrationNamespace() {
         return Ponder.MOD_ID;
     }
 

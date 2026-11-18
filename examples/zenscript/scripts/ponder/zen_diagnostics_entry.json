@@ -1,0 +1,48 @@
+{
+  "namespace": "ponder_zen",
+  "tags": [
+    {
+      "id": "diagnostics",
+      "item": "minecraft:crafting_table",
+      "title": "ZenScript Diagnostics",
+      "description": "External JSON loader and the migrated Ponder diagnostics example.",
+      "addToIndex": true
+    }
+  ],
+  "scenes": [
+    {
+      "component": "minecraft:crafting_table",
+      "schematic": "ponder_legacy:debug/scene_1",
+      "sceneId": "script_entry",
+      "title": "ZenScript Loader Entry",
+      "tags": [
+        "diagnostics"
+      ],
+      "operations": [
+        {
+          "type": "base_plate",
+          "size": 5
+        },
+        {
+          "type": "show_base_plate"
+        },
+        {
+          "type": "idle",
+          "ticks": 10
+        },
+        {
+          "type": "text",
+          "duration": 80,
+          "text": "SceneFiles loaded this entry. Select Ponder ZenScript Diagnostics for the actor and structure walkthrough."
+        },
+        {
+          "type": "idle",
+          "ticks": 80
+        },
+        {
+          "type": "mark_finished"
+        }
+      ]
+    }
+  ]
+}

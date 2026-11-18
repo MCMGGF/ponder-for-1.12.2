@@ -1,0 +1,82 @@
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.16-kappa'
+}
+
+group = 'com.example.ponderaddon'
+version = '1.0.0'
+
+base {
+    archivesName = 'ponder_example'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Unimined may create its Forge repository after this project is configured.
+repositories.withType(org.gradle.api.artifacts.repositories.MavenArtifactRepository).configureEach { repository ->
+    if (repository.name == 'minecraftForge' || repository.url.host == 'maven.minecraftforge.net') {
+        repository.content {
+            includeGroup('net.minecraftforge')
+            includeGroup('de.oceanlabs.mcp')
+        }
+    }
+}
+
+unimined.minecraft {
+    version '1.12.2'
+    mappings {
+        mcp('stable', '39-1.12')
+    }
+    cleanroom {
+        loader '0.5.6-alpha'
+    }
+    defaultRemapJar = false
+    remap(tasks.named('jar').get(), 'remapJar') {
+        archiveBaseName = 'ponder_example'
+        archiveVersion = project.version
+        archiveClassifier = ''
+        destinationDirectory = project.layout.buildDirectory.dir('libs')
+    }
+}
+
+def ponderDevJar = providers.gradleProperty('ponderDevJar')
+    .map { file(it) }
+    .orElse(file('../../build/libs/ponder_legacy-0.3.7-beta-dev.jar'))
+
+dependencies {
+    // This JAR is already in MCP development mappings.
+    compileOnly files(ponderDevJar)
+}
+
+tasks.named('compileJava', JavaCompile) {
+    options.release = 25
+    options.encoding = 'UTF-8'
+    doFirst {
+        if (!ponderDevJar.get().isFile()) {
+            throw new GradleException("Ponder development JAR missing at ${ponderDevJar.get()}. Build it first or set -PponderDevJar.")
+        }
+    }
+}
+
+tasks.named('jar', Jar) {
+    archiveClassifier = 'dev'
+    destinationDirectory = layout.buildDirectory.dir('dev-libs')
+    manifest {
+        attributes('ModType': 'CRL')
+    }
+    from('../../LICENSE', '../../NOTICE.md') {
+        into 'META-INF'
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('remapJar')
+}

@@ -150,8 +150,9 @@ public final class PonderIndex {
     private static void registerAll(List<PonderPlugin> plugins) {
         for (PonderPlugin plugin : plugins) {
             Registries registries = registries();
-            plugin.registerScenes(new DefaultPonderSceneRegistrationHelper(plugin.getModId(), registries.scenes));
-            plugin.registerTags(new DefaultPonderTagRegistrationHelper(plugin.getModId(), registries.tags,
+            String namespace = plugin.getRegistrationNamespace();
+            plugin.registerScenes(new DefaultPonderSceneRegistrationHelper(namespace, registries.scenes));
+            plugin.registerTags(new DefaultPonderTagRegistrationHelper(namespace, registries.tags,
                 registries.localization));
         }
     }
@@ -162,7 +163,7 @@ public final class PonderIndex {
 
     private static void gatherSharedText(List<PonderPlugin> plugins) {
         for (PonderPlugin plugin : plugins) {
-            plugin.registerSharedText(new DefaultSharedTextRegistrationHelper(plugin.getModId(),
+            plugin.registerSharedText(new DefaultSharedTextRegistrationHelper(plugin.getRegistrationNamespace(),
                 registries().localization));
         }
     }

@@ -43,7 +43,6 @@ public final class Ponder {
         PonderIndex.addPlugin(new UiTestPonderPlugin());
         PonderIndex.addPlugin(new ComplexTestPonderPlugin());
         PonderIndex.addPlugin(new MmcePonderPlugin());
-        PonderIndex.addPlugin(new net.createmod.ponder.foundation.content.oil.OilProductionLinePlugin());
         PonderIndex.addPlugin(new ExternalPonderPlugin());
         initialized = true;
     }
