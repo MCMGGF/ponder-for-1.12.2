@@ -42,7 +42,8 @@ notes and the recent display fixes.
 - a six-chapter, pack-specific early petroleum line with real structure snapshots,
   separate conduits, batch storage, player actions and throughput troubleshooting
 
-The current authoring entry is `/pondereditor` in a singleplayer world. See
+Local visual authoring is off by default. Run `/pondereditor enable` to enable it,
+then use `/pondereditor` in a singleplayer world. See
 [the authoring guide](docs/LOCAL_AUTHORING.md) for the actual controls, conversion
 boundaries and workspace layout. Source version does not identify the JAR installed
 in an existing instance; use that instance's installation receipt and actual JAR hash.

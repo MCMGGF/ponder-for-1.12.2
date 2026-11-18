@@ -24,6 +24,7 @@ public final class AuthoringPlugin implements PonderPlugin {
     private List<net.createmod.ponder.authoring.trigger.TriggerDefinition> reloadTriggers;
     @Override public String getModId() { return "ponder_authoring"; }
     @Override public void onPonderReloadStart() {
+        if (!AuthoringSettings.isEnabled()) return;
         reloadDocuments = new ArrayList<>();
         reloadTriggers = new ArrayList<>();
         AuthoringWorkspace w = AuthoringWorkspace.get();
@@ -58,7 +59,7 @@ public final class AuthoringPlugin implements PonderPlugin {
         reloadDocuments = null; reloadTriggers = null;
     }
     @Override public void registerScenes(PonderSceneRegistrationHelper<ResourceLocation> helper) {
-        if (reloadDocuments == null) return;
+        if (!AuthoringSettings.isEnabled() || reloadDocuments == null) return;
         AuthoringWorkspace w = AuthoringWorkspace.get();
         for (AuthoringDocument doc : reloadDocuments) {
             Map<ResourceLocation, List<AuthoringItemBindings.Binding>> grouped = new LinkedHashMap<>();
@@ -76,6 +77,7 @@ public final class AuthoringPlugin implements PonderPlugin {
         }
     }
     @Override public void registerTags(PonderTagRegistrationHelper<ResourceLocation> helper) {
+        if (!AuthoringSettings.isEnabled()) return;
         helper.registerTag(TAG).title("\u672c\u5730\u521b\u4f5c").description("\u5df2\u53d1\u5e03\u7684\u672c\u5730\u6559\u5b66")
             .item(Items.WRITABLE_BOOK).addToIndex().register();
     }

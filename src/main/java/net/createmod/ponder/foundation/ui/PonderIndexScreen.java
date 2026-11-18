@@ -9,6 +9,8 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import net.createmod.ponder.authoring.AuthoringSettings;
+import net.createmod.ponder.client.ClientProxy;
 import net.createmod.ponder.foundation.PonderIndex;
 import net.createmod.ponder.foundation.PonderTag;
 import net.createmod.ponder.foundation.content.VanillaPonderPlugin;
@@ -69,7 +71,7 @@ public class PonderIndexScreen extends AbstractPonderBrowserScreen {
         addFooterButton(BUTTON_RELOAD, OUTER_MARGIN, 60, tr("button.reload"));
         clearFilterButton = addFooterButton(BUTTON_CLEAR_FILTER, OUTER_MARGIN + 64, 92, tr("button.clear_filter"));
         addFooterButton(BUTTON_DONE, width - OUTER_MARGIN - 70, 70, tr("button.done"));
-        if (mc != null && mc.isSingleplayer() && width >= 300) {
+        if (AuthoringSettings.isEnabled() && mc != null && mc.isSingleplayer() && width >= 300) {
             addFooterButton(BUTTON_AUTHOR, OUTER_MARGIN + 160, 24, "E");
         }
         updateButtonState();
@@ -185,8 +187,8 @@ public class PonderIndexScreen extends AbstractPonderBrowserScreen {
             updateButtonState();
         } else if (button.id == BUTTON_DONE) {
             closeToParent();
-        } else if (button.id == BUTTON_AUTHOR) {
-            mc.displayGuiScreen(new AuthoringEditorScreen(this));
+        } else if (button.id == BUTTON_AUTHOR && AuthoringSettings.isEnabled()) {
+            ClientProxy.queueOpenEditorScreen();
         }
     }
 

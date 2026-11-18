@@ -25,9 +25,11 @@ public final class AuthoringWorkspace {
         catch (java.io.IOException invalid) { throw new IllegalStateException("Cannot open authoring assets", invalid); }
     }
     public static synchronized AuthoringWorkspace get() {
+        if (!AuthoringSettings.isEnabled()) throw new IllegalStateException("Local visual authoring is disabled");
         if (instance == null) instance = new AuthoringWorkspace(Loader.instance().getConfigDir().toPath());
         return instance;
     }
+    public static synchronized void release() { instance = null; }
     public AuthoringCompiler getCompiler() { return compiler; }
     public AuthoringStore getStore() { return store; }
     public Path getStoreRoot() { return store.getRoot(); }

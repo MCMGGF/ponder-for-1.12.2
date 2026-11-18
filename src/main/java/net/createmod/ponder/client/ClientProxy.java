@@ -1,5 +1,6 @@
 package net.createmod.ponder.client;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.List;
 
@@ -7,6 +8,10 @@ import javax.annotation.Nullable;
 
 import net.createmod.ponder.CommonProxy;
 import net.createmod.ponder.PonderBackportMod;
+import net.createmod.ponder.authoring.AuthoringPlugin;
+import net.createmod.ponder.authoring.AuthoringSettings;
+import net.createmod.ponder.authoring.AuthoringWorkspace;
+import net.createmod.ponder.authoring.trigger.AuthoringTriggerManager;
 import net.createmod.ponder.command.PonderCommand;
 import net.createmod.ponder.compat.ftbquests.FtbQuestsCompat;
 import net.createmod.ponder.compat.mmce.MmceScriptReloadCompat;
@@ -14,6 +19,7 @@ import net.createmod.ponder.foundation.PonderIndex;
 import net.createmod.ponder.foundation.content.MmcePonderPlugin;
 import net.createmod.ponder.foundation.content.mmce.MmceStaticModelPreviews;
 import net.createmod.ponder.foundation.ui.JeiScreenCompat;
+import net.createmod.ponder.foundation.ui.AuthoringCaptureController;
 import net.createmod.ponder.foundation.ui.AuthoringEditorScreen;
 import net.createmod.ponder.foundation.ui.PonderDebugScreen;
 import net.createmod.ponder.foundation.ui.PonderIndexScreen;
@@ -35,6 +41,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
+import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.input.Keyboard;
@@ -64,7 +71,17 @@ public class ClientProxy extends CommonProxy {
         net.createmod.ponder.foundation.ui.ProjectorSceneRenderer.INSTANCE;
     private net.minecraft.util.math.BlockPos blueprintFirst;
     private Object blueprintWorld;
-    private static boolean captureRegistered;
+    private boolean captureRegistered;
+
+    @Override
+    public void preInit() {
+        try {
+            AuthoringSettings.load(Loader.instance().getConfigDir().toPath());
+        } catch (IOException invalid) {
+            PonderBackportMod.LOGGER.warn("Could not read the local visual authoring preference; using the disabled default", invalid);
+        }
+        PonderIndex.addPlugin(new AuthoringPlugin());
+    }
 
     @Override
     public void init() {
@@ -72,7 +89,7 @@ public class ClientProxy extends CommonProxy {
         registerClientCommand(new PonderCommand());
         registerClientCommand(new PonderClientCommand());
         registerClientCommand(new PonderDebugClientCommand());
-        registerClientCommand(new AuthoringClientCommand());
+        registerClientCommand(new AuthoringClientCommand(this));
         if (openPonderUiKey == null) {
             openPonderUiKey = new KeyBinding("key.ponder.open_ui",
                 KeyConflictContext.IN_GAME, Keyboard.KEY_P, KEY_CATEGORY);
@@ -80,13 +97,48 @@ public class ClientProxy extends CommonProxy {
         }
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(projectorRenderer);
-        if (!captureRegistered) {
-            MinecraftForge.EVENT_BUS.register(net.createmod.ponder.foundation.ui.AuthoringCaptureController.INSTANCE);
-            captureRegistered = true;
-        }
+        syncAuthoringCapture();
         FtbQuestsCompat.register();
         MmceScriptReloadCompat.register(PonderIndex::reload, () -> PonderIndex.getGeneration() > 0L);
         PonderBackportMod.LOGGER.info("Registered Ponder client commands and Ponder UI key binding");
+    }
+
+    private void syncAuthoringCapture() {
+        if (AuthoringSettings.isEnabled() && !captureRegistered) {
+            MinecraftForge.EVENT_BUS.register(AuthoringCaptureController.INSTANCE);
+            captureRegistered = true;
+        } else if (!AuthoringSettings.isEnabled() && captureRegistered) {
+            MinecraftForge.EVENT_BUS.unregister(AuthoringCaptureController.INSTANCE);
+            captureRegistered = false;
+        }
+    }
+
+    boolean canDisableAuthoring() {
+        return !captureRegistered || !AuthoringCaptureController.INSTANCE.isActive();
+    }
+
+    boolean changeAuthoring(boolean enabled) throws IOException {
+        synchronized (PonderIndex.class) {
+            boolean wasEnabled = AuthoringSettings.isEnabled();
+            try {
+                return AuthoringSettings.change(enabled, PonderIndex::getGeneration, PonderIndex::reload);
+            } finally {
+                if (wasEnabled != AuthoringSettings.isEnabled()) {
+                    syncAuthoringCapture();
+                    if (!AuthoringSettings.isEnabled()) {
+                        pendingEditorOpen.clear();
+                        if (pendingHintScene != null) {
+                            pendingHintScene = null;
+                            openViewerQueued = false;
+                        }
+                        AuthoringTriggerManager.disable();
+                        blueprintFirst = null;
+                        blueprintWorld = null;
+                    }
+                }
+                if (!AuthoringSettings.isEnabled()) AuthoringWorkspace.release();
+            }
+        }
     }
 
     @Override
@@ -106,6 +158,7 @@ public class ClientProxy extends CommonProxy {
     }
 
     @Override public void selectBlueprintCorner(net.minecraft.util.math.BlockPos pos, boolean second) {
+        if (!AuthoringSettings.isEnabled()) return;
         Minecraft mc = Minecraft.getMinecraft();
         if (!mc.isSingleplayer() || mc.world == null || mc.player == null) return;
         if (blueprintWorld != mc.world) { blueprintFirst = null; blueprintWorld = mc.world; }
@@ -121,7 +174,7 @@ public class ClientProxy extends CommonProxy {
                     net.createmod.ponder.authoring.assets.BlueprintCapture.fromLoadedWorld(mc.world, Thread.currentThread()),
                     blueprintFirst, pos);
             String id = "local:blueprint_" + Long.toString(System.currentTimeMillis(), 36);
-            net.createmod.ponder.authoring.AuthoringWorkspace.get().getAssets().saveNew(id, captured.schematic);
+            AuthoringWorkspace.get().getAssets().saveNew(id, captured.schematic);
             mc.player.sendMessage(new net.minecraft.util.text.TextComponentString(
                 net.minecraft.client.resources.I18n.format("ponder.authoring.blueprint_saved", id)));
             blueprintFirst = null;
@@ -207,6 +260,7 @@ public class ClientProxy extends CommonProxy {
     }
 
     public static void queueOpenEditorScreen() {
+        if (!AuthoringSettings.isEnabled()) return;
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || !minecraft.isSingleplayer() || minecraft.world == null || minecraft.player == null) {
             return;
@@ -244,7 +298,7 @@ public class ClientProxy extends CommonProxy {
         if (minecraft == null) {
             return;
         }
-        net.createmod.ponder.authoring.trigger.AuthoringTriggerManager.tick();
+        if (AuthoringSettings.isEnabled()) AuthoringTriggerManager.tick();
         if (compatibilityRetryTicks-- <= 0) {
             compatibilityRetryTicks = 20;
             JeiScreenCompat.tryInstall();
@@ -265,7 +319,8 @@ public class ClientProxy extends CommonProxy {
             }
         }
 
-        PendingEditorOpen.Request editorRequest = pendingEditorOpen.consume(minecraft.isSingleplayer(),
+        PendingEditorOpen.Request editorRequest = pendingEditorOpen.consume(
+            AuthoringSettings.isEnabled() && minecraft.isSingleplayer(),
             minecraft.world, minecraft.player, minecraft.currentScreen);
         if (editorRequest != null) {
             openEditorScreen(minecraft, (GuiScreen) editorRequest.parentScreen(minecraft.currentScreen));
@@ -294,7 +349,7 @@ public class ClientProxy extends CommonProxy {
         minecraft.displayGuiScreen(next);
         if (requestedHint != null && minecraft.currentScreen == next && next instanceof PonderDebugScreen
             && ((PonderDebugScreen) next).isShowingScene(requestedHint)) {
-            net.createmod.ponder.authoring.trigger.AuthoringTriggerManager.markOpened(requestedHint);
+            AuthoringTriggerManager.markOpened(requestedHint);
         }
     }
 
@@ -319,8 +374,9 @@ public class ClientProxy extends CommonProxy {
     }
 
     private static boolean queueActiveHint() {
+        if (!AuthoringSettings.isEnabled()) return false;
         net.createmod.ponder.authoring.trigger.TriggerEngine.Hint hint =
-            net.createmod.ponder.authoring.trigger.AuthoringTriggerManager.getActiveHint();
+            AuthoringTriggerManager.getActiveHint();
         if (hint == null) return false;
         int index = 0;
         for (java.util.Map.Entry<ResourceLocation, net.createmod.ponder.api.registration.StoryBoardEntry> entry
@@ -343,7 +399,7 @@ public class ClientProxy extends CommonProxy {
         }
         clearPendingScreen();
         resetTooltipState();
-        net.createmod.ponder.authoring.trigger.AuthoringTriggerManager.clearSession();
+        if (AuthoringSettings.isEnabled()) AuthoringTriggerManager.clearSession();
         projectorRenderer.clear();
         PonderGuiSnapshotRegistry.releaseRuntimeState();
         MmcePonderPlugin.clearPreviewCache();

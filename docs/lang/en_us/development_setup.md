@@ -5,7 +5,10 @@ repository homepage.
 
 ## JDK
 
-This workspace expects a modern JDK for Gradle itself.
+Use Java 25 for Gradle and the Cleanroom client. Cleanroom `0.6.13-alpha` is the
+upper limit for development and in-game acceptance. Keep dependencies and code
+compatible with that version. Gradle's Unimined development loader is pinned to
+`0.5.6-alpha`. The Forge server compatibility jar targets Java 8 bytecode.
 
 If the system default still points to Java 8, use the helper scripts already
 included in the repository:

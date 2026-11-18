@@ -3,6 +3,7 @@ package net.createmod.ponder.foundation.ui;
 import java.util.function.Consumer;
 import net.createmod.ponder.Ponder;
 import net.createmod.ponder.authoring.AuthoringSession;
+import net.createmod.ponder.authoring.AuthoringSettings;
 import net.createmod.ponder.authoring.capture.CaptureDraft;
 import net.createmod.ponder.authoring.capture.CaptureLease;
 import net.createmod.ponder.authoring.capture.VanillaMenuCapture;
@@ -51,6 +52,7 @@ public final class AuthoringCaptureController {
     public GuiButton getCaptureButton() { return active == null ? null : active.button; }
     public CaptureDraft getDraft() { return active == null ? null : active.draft; }
     public void begin(Minecraft mc, GuiScreen editor, AuthoringSession session, int scene, Consumer<String> onReturn) {
+        if (!AuthoringSettings.isEnabled()) throw new IllegalStateException("Local visual authoring is disabled");
         if (active != null) throw new IllegalStateException("A vanilla menu capture is already active");
         if (!mc.isCallingFromMinecraftThread() || !mc.isSingleplayer() || mc.world == null || mc.player == null
             || mc.currentScreen != editor || !(editor instanceof AuthoringEditorScreen)

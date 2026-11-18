@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import javax.annotation.Nullable;
 
 import net.createmod.ponder.Ponder;
+import net.createmod.ponder.authoring.AuthoringSettings;
 import net.createmod.ponder.foundation.PonderScene;
 import net.createmod.ponder.foundation.PonderTag;
 import net.createmod.ponder.foundation.PonderIndex;
@@ -25,7 +26,7 @@ public class PonderUI extends PonderDebugScreen {
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws java.io.IOException {
         if (mc != null && mc.isSingleplayer() && isCtrlKeyDown() && getSelectedScene() != null) {
-            if (keyCode == org.lwjgl.input.Keyboard.KEY_E) {
+            if (AuthoringSettings.isEnabled() && keyCode == org.lwjgl.input.Keyboard.KEY_E) {
                 try { mc.displayGuiScreen(AuthoringEditorScreen.fork(this, getSelectedScene())); }
                 catch (java.io.IOException | RuntimeException invalid) {
                     mc.displayGuiScreen(new AuthoringReviewScreen(this, I18n.format("ponder.authoring.import_review"),

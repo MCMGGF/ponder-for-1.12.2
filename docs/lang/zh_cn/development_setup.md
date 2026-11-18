@@ -4,7 +4,9 @@
 
 ## JDK
 
-这个工作区要求 Gradle 使用现代版本 JDK。
+Gradle 和 Cleanroom 客户端使用 Java 25。开发和游戏验收的 Cleanroom 版本上限为
+`0.6.13-alpha`，依赖和实现须兼容该版本。Gradle 的 Unimined 开发加载器当前固定为
+`0.5.6-alpha`。Forge 服务端兼容包的字节码目标为 Java 8。
 
 如果系统默认仍然指向 Java 8，可以使用仓库中已有的辅助脚本：
 

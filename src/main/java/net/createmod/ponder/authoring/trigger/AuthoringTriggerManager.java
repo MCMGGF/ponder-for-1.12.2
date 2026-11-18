@@ -1,6 +1,7 @@
 package net.createmod.ponder.authoring.trigger;
 
 import com.google.gson.JsonObject;
+import java.util.Collections;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
@@ -51,6 +52,11 @@ public final class AuthoringTriggerManager {
     }
     public static void clearSession() {
         ENGINE.clearSession(); owner = null; revision = -1; tick = 0;
+    }
+    public static void disable() {
+        clearSession();
+        ENGINE.replaceRules(Collections.emptyList());
+        TriggerRegistry.replacePublished(Collections.emptyList());
     }
     public static JsonObject getDiagnostics() {
         JsonObject result = new JsonObject();

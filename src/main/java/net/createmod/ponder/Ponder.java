@@ -45,7 +45,6 @@ public final class Ponder {
         PonderIndex.addPlugin(new MmcePonderPlugin());
         PonderIndex.addPlugin(new net.createmod.ponder.foundation.content.oil.OilProductionLinePlugin());
         PonderIndex.addPlugin(new ExternalPonderPlugin());
-        PonderIndex.addPlugin(new net.createmod.ponder.authoring.AuthoringPlugin());
         initialized = true;
     }
 }
