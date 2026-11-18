@@ -61,7 +61,7 @@ configurations {
 
 sourceSets {
     oilLine {
-        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        compileClasspath += sourceSets.main.output
     }
     oilLineTest {
         compileClasspath += sourceSets.main.output + sourceSets.oilLine.output
@@ -70,6 +70,8 @@ sourceSets {
 }
 
 configurations {
+    oilLineCompileOnly.extendsFrom(compileOnly)
+    oilLineImplementation.extendsFrom(implementation)
     oilLineTestImplementation.extendsFrom(testImplementation)
     oilLineTestRuntimeOnly.extendsFrom(testRuntimeOnly)
 }
@@ -92,7 +94,8 @@ def oilLineJar = tasks.register('oilLineJar', Jar) {
 
 String remapTaskName = propertyBool('enable_shadow') ? 'remapShadowJar' : 'remapJar'
 
-unimined.minecraft {
+unimined.minecraft([sourceSets.main, sourceSets.oilLine]) {
+    boolean optionalAddon = sourceSet.name == 'oilLine'
     version '1.12.2'
 
     mappings {
@@ -104,43 +107,49 @@ unimined.minecraft {
             accessTransformer "${rootProject.projectDir}/src/main/resources/${propertyString('access_transformer_locations')}"
         }
         loader '0.5.6-alpha'
-        runs.auth.username = propertyString('minecraft_username')
-        runs.all {
-            def extraArgs = propertyString('extra_jvm_args')
-            if (extraArgs != null && !extraArgs.trim().isEmpty()) {
-                jvmArgs += extraArgs.split('\\s+').toList()
-            }
-            if (propertyBool('enable_foundation_debug')) {
-                systemProperty('foundation.dump', 'true')
-                systemProperty('foundation.verbose', 'true')
-            }
-            if (propertyBool('is_coremod')) {
-                systemProperty('fml.coreMods.load', propertyString('coremod_plugin_class_name'))
+        if (optionalAddon) {
+            runs.off = true
+        } else {
+            runs.auth.username = propertyString('minecraft_username')
+            runs.all {
+                def extraArgs = propertyString('extra_jvm_args')
+                if (extraArgs != null && !extraArgs.trim().isEmpty()) {
+                    jvmArgs += extraArgs.split('\\s+').toList()
+                }
+                if (propertyBool('enable_foundation_debug')) {
+                    systemProperty('foundation.dump', 'true')
+                    systemProperty('foundation.verbose', 'true')
+                }
+                if (propertyBool('is_coremod')) {
+                    systemProperty('fml.coreMods.load', propertyString('coremod_plugin_class_name'))
+                }
             }
         }
     }
 
     defaultRemapJar = false
 
-    String jarTaskName = propertyBool('enable_shadow') ? 'shadowJar' : 'jar'
-
-    remap(tasks.named(jarTaskName).get()) {
-        mixinRemap {
-            enableBaseMixin()
-            enableMixinExtra()
-            disableRefmap()
+    if (optionalAddon) {
+        // This source set's compile classpath lets the remapper follow GuiScreen overrides through the core.
+        remap(oilLineJar.get(), 'remapOilLineJar') {
+            archiveBaseName = 'ponder_early_oil_line'
+            archiveVersion = project.version
+            archiveClassifier = ''
+            destinationDirectory = project.layout.buildDirectory.dir('optional-libs')
         }
-    }
-    remap(oilLineJar.get(), 'remapOilLineJar') {
-        archiveBaseName = 'ponder_early_oil_line'
-        archiveVersion = project.version
-        archiveClassifier = ''
-        destinationDirectory = project.layout.buildDirectory.dir('optional-libs')
-    }
-
-    mods {
-        remap(configurations.modCompileOnly)
-        remap(configurations.modRuntimeOnly)
+    } else {
+        String jarTaskName = propertyBool('enable_shadow') ? 'shadowJar' : 'jar'
+        remap(tasks.named(jarTaskName).get()) {
+            mixinRemap {
+                enableBaseMixin()
+                enableMixinExtra()
+                disableRefmap()
+            }
+        }
+        mods {
+            remap(configurations.modCompileOnly)
+            remap(configurations.modRuntimeOnly)
+        }
     }
 }
 
