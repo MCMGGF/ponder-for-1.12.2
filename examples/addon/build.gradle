@@ -72,7 +72,7 @@ tasks.named('jar', Jar) {
     manifest {
         attributes('ModType': 'CRL')
     }
-    from('../../LICENSE', '../../NOTICE.md') {
+    from(project.files('../../LICENSE', '../../NOTICE.md')) {
         into 'META-INF'
     }
 }
