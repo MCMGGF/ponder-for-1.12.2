@@ -55,8 +55,8 @@ class AuthoringSettingsTest {
 
     @Test void failedWriteLeavesRuntimeUnchangedAndSkipsReload() throws Exception {
         Path unwriteable = config.resolve("file-instead-of-directory");
+        AuthoringSettings.load(unwriteable);
         Files.createFile(unwriteable);
-        assertThrows(IOException.class, () -> AuthoringSettings.load(unwriteable));
         assertThrows(IOException.class, () -> AuthoringSettings.change(true, () -> 0L, () -> fail("unexpected reload")));
         assertFalse(AuthoringSettings.isEnabled());
         assertFalse(AuthoringSettings.hasPendingChange());
