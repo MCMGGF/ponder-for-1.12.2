@@ -37,12 +37,9 @@ public final class ExamplePonderPlugin implements PonderPlugin {
 
     @Override
     public void registerScenes(PonderSceneRegistrationHelper<ResourceLocation> helper) {
-        helper.addStoryBoard(PISTON, SCHEMATIC, ExamplePonderPlugin::pistonScene, MECHANISMS)
-            .identifiedBy(id("service_loader"));
-        helper.addStoryBoard(STICKY_PISTON, SCHEMATIC, ExamplePonderPlugin::stickyPistonScene, MECHANISMS)
-            .identifiedBy(id("imc_registration"));
-        helper.addStoryBoard(PAPER, SCHEMATIC, ExamplePonderPlugin::localPulseScene, PULSE_TAG)
-            .identifiedBy(id("codec_sync"));
+        helper.addStoryBoard(PISTON, SCHEMATIC, ExamplePonderPlugin::pistonScene, MECHANISMS);
+        helper.addStoryBoard(STICKY_PISTON, SCHEMATIC, ExamplePonderPlugin::stickyPistonScene, MECHANISMS);
+        helper.addStoryBoard(PAPER, SCHEMATIC, ExamplePonderPlugin::localPulseScene, PULSE_TAG);
     }
 
     @Override
