@@ -29,7 +29,8 @@
       "y": 42,
       "width": 48,
       "height": 14,
-      "text": "Ore"
+      "text": "Ore",
+      "color": "#d6e4e8"
     },
     {
       "id": "fuel_label",
@@ -38,7 +39,8 @@
       "y": 42,
       "width": 48,
       "height": 14,
-      "text": "Fuel"
+      "text": "Fuel",
+      "color": "#d6e4e8"
     },
     {
       "id": "output_label",
@@ -47,7 +49,8 @@
       "y": 42,
       "width": 48,
       "height": 14,
-      "text": "Output"
+      "text": "Output",
+      "color": "#d6e4e8"
     },
     {
       "id": "ore",
@@ -93,7 +96,8 @@
       "y": 104,
       "width": 98,
       "height": 15,
-      "text": "Load ore"
+      "text": "Load ore",
+      "color": "#d6e4e8"
     }
   ],
   "keyframes": [
