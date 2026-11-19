@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -20,6 +21,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 import java.util.function.Consumer;
 
+import com.google.common.io.ByteStreams;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -38,9 +40,14 @@ import net.createmod.ponder.api.scene.SceneBuildingUtil;
 import net.createmod.ponder.api.scene.Selection;
 import net.createmod.ponder.foundation.PonderScene;
 import net.createmod.ponder.foundation.registration.PonderComponentMatcher;
+import net.createmod.ponder.foundation.ui.GuiDemoDefinition;
+import net.createmod.ponder.foundation.ui.GuiDemoSnapshot;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.IResource;
+import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.JsonToNBT;
@@ -58,6 +65,10 @@ public final class ExternalPonderScenes {
     static final int MAX_OPERATION_DEPTH = 64;
     static final int MAX_TARGET_POSITIONS_PER_FILE = 262144;
     static final int MAX_ABSOLUTE_BLOCK_COORDINATE = 30000000;
+    private static final int MAX_GUI_DEMO_BYTES = 256 * 1024;
+    private static final int MAX_GUI_DEMO_DURATION = 24000;
+    private static final int GUI_DEMO_HOLD_TICKS = 40;
+    private static final ResourceLocation INLINE_GUI_DEMO = Ponder.asResource("external_gui_demo");
     private static final Map<String, File> SCRIPT_JSON_SOURCES = new LinkedHashMap<String, File>();
 
     private ExternalPonderScenes() {
@@ -174,14 +185,16 @@ public final class ExternalPonderScenes {
             @Override
             public void program(SceneBuilder scene, SceneBuildingUtil util) {
                 scene.title(definition.sceneId, definition.title);
+                GuiDemos guiDemos = new GuiDemos();
                 for (SceneOperation operation : definition.operations) {
-                    applyOperation(scene, util, operation);
+                    applyOperation(scene, util, operation, guiDemos);
                 }
             }
         };
     }
 
-    private static void applyOperation(SceneBuilder scene, SceneBuildingUtil util, SceneOperation operation) {
+    private static void applyOperation(SceneBuilder scene, SceneBuildingUtil util, SceneOperation operation,
+        GuiDemos guiDemos) {
         String type = operation.type;
         if ("base_plate".equals(type)) {
             scene.configureBasePlate(operation.xOffset, operation.zOffset, operation.size);
@@ -322,6 +335,17 @@ public final class ExternalPonderScenes {
             enqueueGuiSnapshotOverlay(scene, util, operation);
             return;
         }
+        if ("show_gui_demo".equals(type)) {
+            enqueueGuiDemo(scene, util, operation, guiDemos);
+            return;
+        }
+        if ("hide_gui_demo".equals(type)) {
+            PonderScene.OverlayEvent active = guiDemos.overlays.remove(operation.overlayId);
+            if (active != null) {
+                active.endGuiAt(scene.getScene().getTotalIdleTicks());
+            }
+            return;
+        }
         if ("block_gui".equals(type) || "machine_gui".equals(type)) {
             enqueueBlockGuiOverlay(scene, util, operation);
             return;
@@ -332,7 +356,7 @@ public final class ExternalPonderScenes {
         }
         if ("gui_interaction".equals(type) || "sequence".equals(type)) {
             for (SceneOperation childOperation : operation.childOperations) {
-                applyOperation(scene, util, childOperation);
+                applyOperation(scene, util, childOperation, guiDemos);
             }
             return;
         }
@@ -432,6 +456,54 @@ public final class ExternalPonderScenes {
         }
         scene.getScene().recordOperation("overlay.showGuiSnapshot(" + textureLocation + ", " + width + "x" + height
             + ", " + operation.duration + ")");
+    }
+
+    private static void enqueueGuiDemo(SceneBuilder scene, SceneBuildingUtil util, SceneOperation operation,
+        GuiDemos guiDemos) {
+        GuiDemoDefinition definition = operation.guiDemo;
+        if (operation.guiDemoResource != null) {
+            definition = guiDemos.resolve(operation.guiDemoResource);
+        }
+        if (definition == null) {
+            return;
+        }
+
+        int duration = operation.duration == -1
+            ? Math.min(MAX_GUI_DEMO_DURATION, definition.lastKeyframeTick() + GUI_DEMO_HOLD_TICKS)
+            : operation.duration;
+        PonderScene.OverlayEvent event = scene.getScene().createOverlayEvent(duration)
+            .palette(parsePalette(operation.color))
+            .connectorVisible(operation.connectorVisible)
+            .overlayId(operation.overlayId)
+            .placeNearTarget(operation.placeNearTarget)
+            .offset(operation.offsetX, Math.round(operation.offsetY))
+            .guiSnapshot(operation.guiDemoResource == null ? INLINE_GUI_DEMO : operation.guiDemoResource);
+        event.setGuiSnapshotProvider(GuiDemoSnapshot.provider(definition, event.getTick()));
+        applyOverlayAnchor(event, util, operation);
+        if (operation.independentY != Integer.MIN_VALUE) {
+            event.independent(operation.independentY);
+        }
+        if (operation.overlayId != null) {
+            PonderScene.OverlayEvent previous = guiDemos.overlays.put(operation.overlayId, event);
+            if (previous != null) {
+                previous.endGuiAt(event.getTick());
+            }
+        }
+    }
+
+    static GuiDemoDefinition readGuiDemo(IResourceManager resources, ResourceLocation id) throws IOException {
+        ResourceLocation json = new ResourceLocation(id.getNamespace(), "ponder/gui_demos/" + id.getPath() + ".json");
+        try (IResource resource = resources.getResource(json)) {
+            byte[] data = ByteStreams.toByteArray(ByteStreams.limit(resource.getInputStream(), MAX_GUI_DEMO_BYTES + 1L));
+            if (data.length > MAX_GUI_DEMO_BYTES) {
+                throw new IllegalArgumentException("GUI demo JSON exceeds " + MAX_GUI_DEMO_BYTES + " bytes");
+            }
+            JsonElement root = new JsonParser().parse(new String(data, StandardCharsets.UTF_8));
+            if (!root.isJsonObject()) {
+                throw new IllegalArgumentException("GUI demo JSON must be an object");
+            }
+            return GuiDemoDefinition.parse(root.getAsJsonObject());
+        }
     }
 
     private static void enqueueBlockGuiOverlay(SceneBuilder scene, SceneBuildingUtil util, SceneOperation operation) {
@@ -839,6 +911,12 @@ public final class ExternalPonderScenes {
         operation.text = readString(object, "text", "");
         operation.color = readString(object, "color", "WHITE");
         operation.overlayId = readOptionalString(object, "id");
+        if ("show_gui_demo".equals(operation.type)) {
+            operation.overlayId = object.has("id") ? readGuiDemoOverlayId(object) : null;
+            parseGuiDemo(operation, object, defaultNamespace);
+        } else if ("hide_gui_demo".equals(operation.type)) {
+            operation.overlayId = readGuiDemoOverlayId(object);
+        }
         operation.parentOverlayId = readOptionalString(object, "gui");
         operation.parentGuiId = readOptionalString(object, "parentGui");
         operation.blockGui = readOptionalString(object, "blockGui");
@@ -885,6 +963,37 @@ public final class ExternalPonderScenes {
         return operation;
     }
 
+    private static void parseGuiDemo(SceneOperation operation, JsonObject object, String defaultNamespace) {
+        JsonElement demo = object.get("demo");
+        if (demo != null && demo.isJsonObject()) {
+            operation.guiDemo = GuiDemoDefinition.parse(demo.getAsJsonObject());
+        } else if (demo != null && demo.isJsonPrimitive() && demo.getAsJsonPrimitive().isString()) {
+            ResourceLocation id = parseLocation(demo.getAsString(), defaultNamespace);
+            if (!id.getNamespace().matches("[a-z0-9_.-]+") || ".".equals(id.getNamespace())
+                || "..".equals(id.getNamespace()) || !id.getPath().matches("[a-z0-9_.-]+(/[a-z0-9_.-]+)*")
+                || Arrays.stream(id.getPath().split("/")).anyMatch(part -> ".".equals(part) || "..".equals(part))) {
+                throw new IllegalArgumentException("Invalid GUI demo resource id: " + id);
+            }
+            operation.guiDemoResource = id;
+        } else {
+            throw new IllegalArgumentException("show_gui_demo requires demo to be a definition object or resource id");
+        }
+        if (!object.has("duration")) {
+            operation.duration = -1;
+        } else if (!object.get("duration").isJsonPrimitive() || !object.get("duration").getAsJsonPrimitive().isNumber()
+            || operation.duration < 1 || operation.duration > MAX_GUI_DEMO_DURATION) {
+            throw new IllegalArgumentException("show_gui_demo duration must be 1.." + MAX_GUI_DEMO_DURATION + " ticks");
+        }
+    }
+
+    private static String readGuiDemoOverlayId(JsonObject object) {
+        JsonElement id = object.get("id");
+        if (id == null || !id.isJsonPrimitive() || !id.getAsJsonPrimitive().isString() || id.getAsString().trim().isEmpty()) {
+            throw new IllegalArgumentException("GUI demo id must be a non-empty string");
+        }
+        return id.getAsString().trim();
+    }
+
     private static void validateExecutionBudget(List<SceneOperation> operations, ExpansionBudget budget,
         ExecutionState state) {
         for (SceneOperation operation : operations) {
@@ -928,6 +1037,7 @@ public final class ExternalPonderScenes {
                 budget.consumeTargets("set_block".equals(type) && operation.blockNbt != null ? 2 : 1);
             } else if ("text".equals(type) || "outline_text".equals(type)
                 || "gui_texture".equals(type) || "gui_snapshot".equals(type)
+                || "show_gui_demo".equals(type)
                 || "block_gui".equals(type) || "machine_gui".equals(type)
                 || "gui_outline_text".equals(type)) {
                 if ("outline_text".equals(type)) {
@@ -1650,6 +1760,27 @@ public final class ExternalPonderScenes {
         private long basePlatePositions = 25;
     }
 
+    private static final class GuiDemos {
+        private final Map<String, PonderScene.OverlayEvent> overlays = new LinkedHashMap<>();
+        private final Map<ResourceLocation, GuiDemoDefinition> definitions = new LinkedHashMap<>();
+
+        private GuiDemoDefinition resolve(ResourceLocation id) {
+            if (!definitions.containsKey(id)) {
+                GuiDemoDefinition definition = null;
+                Minecraft minecraft = Minecraft.getMinecraft();
+                if (minecraft != null && minecraft.getResourceManager() != null) {
+                    try {
+                        definition = readGuiDemo(minecraft.getResourceManager(), id);
+                    } catch (RuntimeException | IOException failure) {
+                        Ponder.LOGGER.warn("Unable to load external GUI demo '{}'", id, failure);
+                    }
+                }
+                definitions.put(id, definition);
+            }
+            return definitions.get(id);
+        }
+    }
+
     static final class ExternalDefinitionSet {
         private final List<TagDefinition> tags = new ArrayList<TagDefinition>();
         private final List<SceneDefinition> scenes = new ArrayList<SceneDefinition>();
@@ -1732,6 +1863,8 @@ public final class ExternalPonderScenes {
         private boolean placeNearTarget;
         private String pointMode;
         private String snapshot;
+        private GuiDemoDefinition guiDemo;
+        private ResourceLocation guiDemoResource;
         private String texture;
         private int textureU;
         private int textureV;

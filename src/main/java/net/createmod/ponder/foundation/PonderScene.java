@@ -444,6 +444,7 @@ public class PonderScene {
     public static final class OverlayEvent {
         private final int tick;
         private int recordedOrder = -1;
+        private int hiddenAtTick = -1;
         private int duration;
         OverlayEventType type = OverlayEventType.TEXT;
         String text = "";
@@ -515,6 +516,16 @@ public class PonderScene {
             if (type != OverlayEventType.GUI_TEXTURE || duration < 0 || duration > 24000)
                 throw new IllegalArgumentException("GUI duration must be 0..24000 ticks");
             this.duration = Math.max(1, duration);
+        }
+
+        public void endGuiAt(int endTick) {
+            if (type != OverlayEventType.GUI_TEXTURE || endTick < tick)
+                throw new IllegalArgumentException("A GUI overlay end must be on or after its start");
+            int elapsed = endTick - tick;
+            if (elapsed <= duration) {
+                duration = elapsed;
+                hiddenAtTick = endTick;
+            }
         }
 
         public OverlayEventType getType() {
@@ -1231,6 +1242,7 @@ public class PonderScene {
 
     public boolean isOverlayCleared(OverlayEvent overlay, float tick) {
         if (overlay == null || overlay.recordedOrder < 0) return false;
+        if (overlay.hiddenAtTick >= 0 && tick >= overlay.hiddenAtTick) return true;
         OverlayEventType type = overlay.getType();
         if (type != OverlayEventType.TEXT && type != OverlayEventType.SCENE_OUTLINE
             && type != OverlayEventType.SCENE_LINE && type != OverlayEventType.VALUE_BOX) return false;

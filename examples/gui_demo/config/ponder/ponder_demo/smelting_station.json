@@ -1,0 +1,72 @@
+{
+  "namespace": "ponder_demo",
+  "scenes": [
+    {
+      "component": "minecraft:furnace",
+      "componentKey": "ponder_demo:smelting_station",
+      "schematic": "ponder_legacy:mmce/empty",
+      "sceneId": "smelting_station",
+      "title": "Scripted Smelting Station",
+      "operations": [
+        {
+          "type": "base_plate",
+          "xOffset": 0,
+          "zOffset": 0,
+          "size": 5
+        },
+        {
+          "type": "show_base_plate"
+        },
+        {
+          "type": "set_blocks",
+          "from": [
+            0,
+            0,
+            0
+          ],
+          "to": [
+            4,
+            0,
+            4
+          ],
+          "state": "minecraft:stonebrick"
+        },
+        {
+          "type": "set_block",
+          "pos": [
+            2,
+            1,
+            2
+          ],
+          "state": "minecraft:furnace",
+          "meta": 2
+        },
+        {
+          "type": "idle",
+          "ticks": 20
+        },
+        {
+          "type": "show_gui_demo",
+          "id": "station",
+          "demo": "ponder_demo:smelting_station",
+          "duration": 180
+        },
+        {
+          "type": "idle",
+          "ticks": 160
+        },
+        {
+          "type": "hide_gui_demo",
+          "id": "station"
+        },
+        {
+          "type": "idle",
+          "ticks": 20
+        },
+        {
+          "type": "mark_finished"
+        }
+      ]
+    }
+  ]
+}

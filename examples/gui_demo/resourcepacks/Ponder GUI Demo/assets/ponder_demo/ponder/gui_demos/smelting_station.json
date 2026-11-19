@@ -1,0 +1,325 @@
+{
+  "width": 208,
+  "height": 132,
+  "background": "ponder_demo:textures/gui/smelting_station.png",
+  "widgets": [
+    {
+      "id": "control_tab",
+      "type": "tab",
+      "x": 12,
+      "y": 10,
+      "width": 62,
+      "height": 16,
+      "text": "Smelting",
+      "active": true
+    },
+    {
+      "id": "results_tab",
+      "type": "tab",
+      "x": 78,
+      "y": 10,
+      "width": 52,
+      "height": 16,
+      "text": "Results"
+    },
+    {
+      "id": "ore_label",
+      "type": "status",
+      "x": 15,
+      "y": 42,
+      "width": 48,
+      "height": 14,
+      "text": "Ore"
+    },
+    {
+      "id": "fuel_label",
+      "type": "status",
+      "x": 79,
+      "y": 42,
+      "width": 48,
+      "height": 14,
+      "text": "Fuel"
+    },
+    {
+      "id": "output_label",
+      "type": "status",
+      "x": 145,
+      "y": 42,
+      "width": 48,
+      "height": 14,
+      "text": "Output"
+    },
+    {
+      "id": "ore",
+      "type": "slot",
+      "x": 29,
+      "y": 63
+    },
+    {
+      "id": "fuel",
+      "type": "slot",
+      "x": 93,
+      "y": 63
+    },
+    {
+      "id": "output",
+      "type": "slot",
+      "x": 159,
+      "y": 63
+    },
+    {
+      "id": "start",
+      "type": "button",
+      "x": 147,
+      "y": 10,
+      "width": 45,
+      "height": 16,
+      "text": "Start"
+    },
+    {
+      "id": "progress",
+      "type": "progress",
+      "x": 12,
+      "y": 105,
+      "width": 78,
+      "height": 13,
+      "value": 0,
+      "color": "#56bdb0"
+    },
+    {
+      "id": "state",
+      "type": "status",
+      "x": 97,
+      "y": 104,
+      "width": 98,
+      "height": 15,
+      "text": "Load ore"
+    }
+  ],
+  "keyframes": [
+    {
+      "tick": 0,
+      "pointer": {
+        "x": 16,
+        "y": 86
+      }
+    },
+    {
+      "tick": 12,
+      "pointer": {
+        "target": "ore",
+        "pressed": false
+      },
+      "updates": {
+        "ore": {
+          "highlighted": true
+        }
+      }
+    },
+    {
+      "tick": 18,
+      "pointer": {
+        "target": "ore",
+        "pressed": true
+      },
+      "updates": {
+        "ore": {
+          "item": "minecraft:iron_ore",
+          "count": 2
+        },
+        "state": {
+          "text": "Load fuel"
+        }
+      }
+    },
+    {
+      "tick": 23,
+      "pointer": {
+        "target": "ore",
+        "pressed": false
+      },
+      "updates": {
+        "ore": {
+          "highlighted": false
+        }
+      }
+    },
+    {
+      "tick": 35,
+      "pointer": {
+        "target": "fuel",
+        "pressed": false
+      },
+      "updates": {
+        "fuel": {
+          "highlighted": true
+        }
+      }
+    },
+    {
+      "tick": 41,
+      "pointer": {
+        "target": "fuel",
+        "pressed": true
+      },
+      "updates": {
+        "fuel": {
+          "item": "minecraft:coal"
+        },
+        "state": {
+          "text": "Ready to smelt"
+        }
+      }
+    },
+    {
+      "tick": 46,
+      "pointer": {
+        "target": "fuel",
+        "pressed": false
+      },
+      "updates": {
+        "fuel": {
+          "highlighted": false
+        }
+      }
+    },
+    {
+      "tick": 60,
+      "pointer": {
+        "target": "start",
+        "pressed": false
+      },
+      "updates": {
+        "start": {
+          "highlighted": true
+        }
+      }
+    },
+    {
+      "tick": 65,
+      "pointer": {
+        "target": "start",
+        "pressed": true
+      },
+      "updates": {
+        "start": {
+          "active": true
+        },
+        "fuel": {
+          "item": null
+        },
+        "state": {
+          "text": "Smelting 1 of 2"
+        }
+      }
+    },
+    {
+      "tick": 71,
+      "pointer": {
+        "target": "start",
+        "pressed": false
+      },
+      "updates": {
+        "start": {
+          "active": false,
+          "highlighted": false
+        }
+      }
+    },
+    {
+      "tick": 76,
+      "pointer": null
+    },
+    {
+      "tick": 80,
+      "updates": {
+        "progress": {
+          "value": 0.25
+        }
+      }
+    },
+    {
+      "tick": 92,
+      "updates": {
+        "progress": {
+          "value": 0.5
+        },
+        "ore": {
+          "count": 1
+        },
+        "output": {
+          "item": "minecraft:iron_ingot"
+        },
+        "state": {
+          "text": "Smelting 2 of 2"
+        }
+      }
+    },
+    {
+      "tick": 104,
+      "updates": {
+        "progress": {
+          "value": 0.75
+        }
+      }
+    },
+    {
+      "tick": 116,
+      "pointer": {
+        "x": 132,
+        "y": 34
+      },
+      "updates": {
+        "progress": {
+          "value": 1
+        },
+        "ore": {
+          "item": null
+        },
+        "output": {
+          "count": 2,
+          "highlighted": true
+        },
+        "state": {
+          "text": "2 ingots ready"
+        }
+      }
+    },
+    {
+      "tick": 126,
+      "pointer": {
+        "target": "results_tab",
+        "pressed": false
+      }
+    },
+    {
+      "tick": 131,
+      "pointer": {
+        "target": "results_tab",
+        "pressed": true
+      },
+      "updates": {
+        "control_tab": {
+          "active": false
+        },
+        "results_tab": {
+          "active": true
+        }
+      }
+    },
+    {
+      "tick": 136,
+      "pointer": {
+        "target": "results_tab",
+        "pressed": false
+      }
+    },
+    {
+      "tick": 146,
+      "pointer": {
+        "target": "output",
+        "pressed": false
+      }
+    }
+  ]
+}

@@ -1,6 +1,9 @@
 package net.createmod.ponder.foundation.external;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -13,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +42,10 @@ import net.createmod.ponder.foundation.registration.DefaultPonderTagRegistration
 import net.createmod.ponder.foundation.registration.PonderLocalization;
 import net.createmod.ponder.foundation.registration.PonderSceneRegistry;
 import net.createmod.ponder.foundation.registration.PonderTagRegistry;
+import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry;
+import net.minecraft.client.resources.FolderResourcePack;
+import net.minecraft.client.resources.SimpleReloadableResourceManager;
+import net.minecraft.client.resources.data.MetadataSerializer;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
@@ -87,6 +95,73 @@ class ExternalPonderScenesTest {
             }
         }
         Files.delete(directory);
+    }
+
+    @Test
+    void guiDemoOverlaysUseSceneLocalProvidersAndHideAtTheScheduledTick() {
+        JsonObject definition = new JsonObject();
+        definition.addProperty("width", 36);
+        definition.addProperty("height", 24);
+        JsonArray keyframes = new JsonArray();
+        JsonObject keyframe = new JsonObject();
+        keyframe.addProperty("tick", 8);
+        keyframes.add(keyframe);
+        definition.add("keyframes", keyframes);
+        JsonObject first = operation("show_gui_demo");
+        first.add("demo", definition);
+        first.addProperty("id", "demo");
+        first.addProperty("offsetX", 13);
+        JsonObject hide = operation("hide_gui_demo");
+        hide.addProperty("id", "demo");
+        JsonObject second = operation("show_gui_demo");
+        second.add("demo", definition);
+        second.addProperty("id", "demo");
+        register(write("gui-demo", document(scene("gui_demo", idle(12), first, idle(10), hide, idle(4), second))));
+
+        PonderScene scene = programOnlyScene();
+        PonderScene.OverlayEvent original = scene.getOverlayEvents().get(0);
+        PonderScene.OverlayEvent replay = scene.getOverlayEvents().get(1);
+        assertEquals(12, original.getTick());
+        assertEquals(13, original.getOffsetX());
+        assertEquals(10, original.getDuration());
+        assertFalse(scene.isOverlayCleared(original, 21.5F));
+        assertTrue(scene.isOverlayCleared(original, 22F));
+        assertFalse(scene.isOverlayCleared(original, 20F));
+        assertEquals(26, replay.getTick());
+        assertEquals(48, replay.getDuration());
+        assertNotSame(original.getGuiSnapshotProvider(), replay.getGuiSnapshotProvider());
+        assertNull(PonderGuiSnapshotRegistry.resolve(replay, 25.9F));
+        assertEquals(36, PonderGuiSnapshotRegistry.resolve(replay, 26F).displayWidth);
+    }
+
+    @Test
+    void readsGuiDemoFromTheActiveResourcePackWithNestedPaths(@TempDir Path packs) throws IOException {
+        Path low = packs.resolve("low");
+        Path high = packs.resolve("high");
+        String resourcePath = "assets/sample/ponder/gui_demos/machines/display.json";
+        Path lowJson = low.resolve(resourcePath);
+        Path highJson = high.resolve(resourcePath);
+        Files.createDirectories(lowJson.getParent());
+        Files.createDirectories(highJson.getParent());
+        Files.write(lowJson, "{\"width\":36,\"height\":24}".getBytes(StandardCharsets.UTF_8));
+        Files.write(highJson, "{\"width\":48,\"height\":24}".getBytes(StandardCharsets.UTF_8));
+        FolderResourcePack basePack = new FolderResourcePack(low.toFile());
+        FolderResourcePack overridePack = new FolderResourcePack(high.toFile());
+        SimpleReloadableResourceManager resources = new SimpleReloadableResourceManager(new MetadataSerializer());
+        resources.reloadResources(Arrays.asList(basePack, overridePack));
+
+        ResourceLocation id = new ResourceLocation("sample", "machines/display");
+        assertEquals(48, ExternalPonderScenes.readGuiDemo(resources, id).width());
+        resources.reloadResources(Collections.singletonList(basePack));
+        assertEquals(36, ExternalPonderScenes.readGuiDemo(resources, id).width());
+    }
+
+    @Test
+    void rejectsMalformedGuiDemoOperationsBeforeTheyEnterTheRegistry() {
+        JsonObject invalidReference = operation("show_gui_demo");
+        invalidReference.addProperty("demo", "pack:folder/../other");
+        JsonObject missingHideId = operation("hide_gui_demo");
+        rejectOperations(invalidReference, missingHideId);
     }
 
     @Test
