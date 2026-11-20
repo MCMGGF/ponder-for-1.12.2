@@ -3,6 +3,7 @@ package net.createmod.ponder.foundation.ui;
 import java.util.Map;
 import net.createmod.ponder.Ponder;
 import net.createmod.ponder.foundation.content.mmce.MmcePreviewSafety;
+import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition.Insets;
 import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition.Stack;
 import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition.State;
 import net.createmod.ponder.foundation.ui.GuiDemoDefinition.Pointer;
@@ -33,9 +34,10 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
     private static final int OUTSIDE_GUI = -4096;
 
     private final BlockGuiDemoDefinition definition;
+    private final Insets capture;
     private final int startTick;
-    private final Snapshot fallback = Snapshot.liveRenderer(176, 166, false, this);
-    private Snapshot snapshot = fallback;
+    private final Snapshot fallback;
+    private Snapshot snapshot;
     private DetachedPonderWorld world;
     private EntityPlayerSP player;
     private GuiContainer gui;
@@ -44,7 +46,10 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
 
     private BlockGuiDemoSnapshot(BlockGuiDemoDefinition definition, int startTick) {
         this.definition = definition;
+        this.capture = definition.capture();
         this.startTick = startTick;
+        fallback = captureSnapshot(176, 166);
+        snapshot = fallback;
     }
 
     static SnapshotProvider provider(BlockGuiDemoDefinition definition, int startTick) {
@@ -92,14 +97,15 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
                 apply(state);
                 applied = state;
             }
-            int guiWidth = gui.getXSize();
-            int guiHeight = gui.getYSize();
-            float scale = Math.min(width / (float) guiWidth, height / (float) guiHeight);
+            int captureWidth = snapshot.displayWidth;
+            int captureHeight = snapshot.displayHeight;
+            float scale = Math.min(width / (float) captureWidth, height / (float) captureHeight);
             GlStateManager.matrixMode(GL11.GL_MODELVIEW);
-            GlStateManager.translate(x + (width - guiWidth * scale) / 2F,
-                y + (height - guiHeight * scale) / 2F, 0);
+            GlStateManager.translate(x + (width - captureWidth * scale) / 2F,
+                y + (height - captureHeight * scale) / 2F, 0);
             GlStateManager.scale(scale, scale, 1);
-            GlStateManager.translate(-gui.getGuiLeft(), -gui.getGuiTop(), 0);
+            // The scene layout clips to the full capture. Native widgets and pointer targets still use the base GUI.
+            GlStateManager.translate(capture.left() - gui.getGuiLeft(), capture.top() - gui.getGuiTop(), 0);
             GlStateManager.disableDepth();
             GlStateManager.depthMask(false);
             GlStateManager.color(1, 1, 1, 1);
@@ -142,8 +148,14 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
             if (width < 1 || height < 1) {
                 throw new IllegalArgumentException("Native GUI has invalid dimensions");
             }
-            snapshot = Snapshot.liveRenderer(width, height, false, this);
+            snapshot = captureSnapshot(width, height);
         }
+    }
+
+    private Snapshot captureSnapshot(int guiWidth, int guiHeight) {
+        int width = Math.addExact(guiWidth, capture.left() + capture.right());
+        int height = Math.addExact(guiHeight, capture.top() + capture.bottom());
+        return Snapshot.liveRenderer(width, height, false, this);
     }
 
     private GuiContainer vanillaScreen(NativeGuiPreviewScope scope) {

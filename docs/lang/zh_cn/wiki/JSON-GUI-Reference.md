@@ -79,6 +79,8 @@
 
 使用 Forge 注册的 GUI 时，在 `source.guiId` 填写客户端 GUI 的数字 ID。`source.mod` 默认使用方块 ID 的命名空间。GUI 处理器需要使用传入的隔离世界和玩家返回 `GuiContainer`。演示的槽位和属性更新只作用于隔离容器，指针按压由时间轴绘制。
 
+可选的 `source.capture` 可把同一界面在主 GUI 矩形之外绘制的侧栏纳入演示。`left`、`top`、`right`、`bottom` 分别接受 0 到 512 的整数，单位为 GUI 像素，各边默认为 0。例如 `"capture": {"left": 24, "right": 80}` 会向左扩展 24 像素，向右扩展 80 像素。指针坐标仍以主 GUI 左上角为原点。使用上述边距时，`"pointer": {"x": -12, "y": 20}` 指向左侧扩展区域。
+
 关键帧的 `tick` 相对于叠层开始时间。`slots` 以容器槽位编号为键，值是包含 `item` 注册 ID 的物品栈，也可指定 `count`、`meta` 和物品 `nbt`。用 `null` 清空槽位。`properties` 以容器属性编号为键，值为整数。槽位和属性编号由各机器容器定义。关键帧省略的字段沿用已有状态。`pointer` 可通过 `slot` 指向槽位，或使用 GUI 内的 `x`、`y` 坐标定位，也可指定 `pressed`。用 `pointer: null` 隐藏指针。
 
 场景时间轴决定每次变化何时显示。暂停时保持当前状态，回退时恢复到所选 tick 的状态。指针演示脚本安排的操作。下面的例子向原版熔炉输入槽放入铁矿石，燃料、进度和出料见[完整示例](../../../../examples/gui_demo/config/ponder/ponder_demo/vanilla_furnace.json)。

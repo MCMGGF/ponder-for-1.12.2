@@ -29,6 +29,7 @@ class BlockGuiDemoDefinitionTest {
 
         assertEquals("minecraft:furnace", demo.block().toString());
         assertEquals(3, demo.meta());
+        assertEquals(new BlockGuiDemoDefinition.Insets(0, 0, 0, 0), demo.capture());
         assertEquals(20, demo.lastKeyframeTick());
         assertEquals(Set.of(0, 2), demo.stateAt(20).slots().keySet());
         assertEquals(Set.of(1, 2), demo.stateAt(20).properties().keySet());
@@ -51,6 +52,38 @@ class BlockGuiDemoDefinitionTest {
         assertEquals(1, ore.nbt().getByte("Demo"));
         demo.tileNbt().setShort("BurnTime", (short) 0);
         assertEquals(10, demo.tileNbt().getShort("BurnTime"));
+    }
+
+    @Test
+    void captureMarginsKeepPointerCoordinatesRelativeToTheGui() {
+        BlockGuiDemoDefinition demo = parse("""
+            {
+              "source":{"type":"block_gui","block":"minecraft:furnace","capture":{"left":40,"top":12,"right":512}},
+              "keyframes":[{"tick":0,"pointer":{"x":-40,"y":-12}},{"tick":10,"pointer":{"slot":0}}]
+            }
+            """);
+
+        assertEquals(new BlockGuiDemoDefinition.Insets(40, 12, 512, 0), demo.capture());
+        assertEquals(new Pointer(-40, -12, false), demo.pointerAt(0, index -> new Pointer(20, 8, false)));
+        assertEquals(new Pointer(-10, -2, false), demo.pointerAt(5, index -> new Pointer(20, 8, false)));
+    }
+
+    @Test
+    void rejectsMalformedCaptureAndOutOfMarginPointerCoordinates() {
+        for (String capture : Set.of("null", "[]", "{\"width\":1}", "{\"left\":-1}", "{\"right\":513}",
+            "{\"bottom\":0.5}", "{\"top\":\"1\"}")) {
+            assertThrows(IllegalArgumentException.class, () -> parse("""
+                {"source":{"type":"block_gui","block":"minecraft:furnace","capture":%s}}
+                """.formatted(capture)), capture);
+        }
+        for (String pointer : Set.of("{\"x\":-5,\"y\":0}", "{\"x\":0,\"y\":-3}", "{\"y\":0}", "{\"x\":0}")) {
+            assertThrows(IllegalArgumentException.class, () -> parse("""
+                {
+                  "source":{"type":"block_gui","block":"minecraft:furnace","capture":{"left":4,"top":2}},
+                  "keyframes":[{"tick":0,"pointer":%s}]
+                }
+                """.formatted(pointer)), pointer);
+        }
     }
 
     @Test

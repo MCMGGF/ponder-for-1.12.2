@@ -28,8 +28,13 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     private static final int MAX_DEMO_TICK = 23_999;
     private static final int MAX_SLOT = 4095;
     private static final int MAX_POINTER_COORDINATE = 4095;
+    private static final int MAX_CAPTURE_MARGIN = 512;
     private static final int MAX_NBT_LENGTH = 8192;
     private static final int MAX_NBT_DEPTH = 64;
+
+    record Insets(int left, int top, int right, int bottom) {
+        private static final Insets NONE = new Insets(0, 0, 0, 0);
+    }
 
     record Stack(ResourceLocation item, int count, int meta, NBTTagCompound nbt) {
         @Override
@@ -57,6 +62,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     private final NBTTagCompound tileNbt;
     private final Integer guiId;
     private final String guiModId;
+    private final Insets capture;
     private final NavigableMap<Integer, NavigableMap<Integer, Stack>> slots = new TreeMap<>();
     private final NavigableMap<Integer, NavigableMap<Integer, Integer>> properties = new TreeMap<>();
     private final NavigableMap<Integer, PointerTarget> pointers = new TreeMap<>();
@@ -71,6 +77,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
         }
         guiId = source.has("guiId") ? integer(source, "guiId", 0, Integer.MIN_VALUE, Integer.MAX_VALUE) : null;
         guiModId = string(source, "mod", block.getNamespace());
+        capture = readCapture(source.get("capture"));
         if (!guiModId.matches("[a-z0-9_.-]+") || guiModId.equals(".") || guiModId.equals("..")) {
             throw new IllegalArgumentException("source.mod must be a mod id");
         }
@@ -83,7 +90,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
                 readTrackUpdates(frame, "properties", Integer.MAX_VALUE, tick, properties,
                     value -> integer(value, "property value", 0, Integer.MIN_VALUE, Integer.MAX_VALUE));
                 if (frame.has("pointer")) {
-                    pointers.put(tick, readPointer(frame.get("pointer")));
+                    pointers.put(tick, readPointer(frame.get("pointer"), capture));
                 }
             } catch (IllegalArgumentException invalid) {
                 throw new IllegalArgumentException("Keyframe " + tick + ": " + invalid.getMessage(), invalid);
@@ -95,7 +102,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     public static BlockGuiDemoDefinition parse(JsonObject root) {
         fields(root, Set.of("source", "keyframes"));
         JsonObject source = object(root.get("source"), "source");
-        fields(source, Set.of("type", "block", "meta", "tileNbt", "guiId", "mod"));
+        fields(source, Set.of("type", "block", "meta", "tileNbt", "guiId", "mod", "capture"));
         if (!"block_gui".equals(string(source, "type", ""))) {
             throw new IllegalArgumentException("GUI demo source.type must be block_gui");
         }
@@ -134,6 +141,10 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
         return guiModId;
     }
 
+    Insets capture() {
+        return capture;
+    }
+
     State stateAt(float tick) {
         int wholeTick = (int) Math.floor(tick);
         return new State(valuesAt(slots, wholeTick), valuesAt(properties, wholeTick));
@@ -160,7 +171,20 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
         return entry == null || entry.getValue() == null ? null : entry.getValue().resolve(slotCenter);
     }
 
-    private static PointerTarget readPointer(JsonElement value) {
+    private static Insets readCapture(JsonElement value) {
+        if (value == null) {
+            return Insets.NONE;
+        }
+        JsonObject capture = object(value, "source.capture");
+        fields(capture, Set.of("left", "top", "right", "bottom"));
+        return new Insets(
+            integer(capture.get("left"), "source.capture.left", 0, 0, MAX_CAPTURE_MARGIN),
+            integer(capture.get("top"), "source.capture.top", 0, 0, MAX_CAPTURE_MARGIN),
+            integer(capture.get("right"), "source.capture.right", 0, 0, MAX_CAPTURE_MARGIN),
+            integer(capture.get("bottom"), "source.capture.bottom", 0, 0, MAX_CAPTURE_MARGIN));
+    }
+
+    private static PointerTarget readPointer(JsonElement value, Insets capture) {
         if (value.isJsonNull()) {
             return null;
         }
@@ -173,8 +197,8 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
             }
             return new PointerTarget(integer(pointer, "slot", -1, 0, MAX_SLOT), 0, 0, pressed);
         }
-        return new PointerTarget(null, integer(pointer, "x", -1, 0, MAX_POINTER_COORDINATE),
-            integer(pointer, "y", -1, 0, MAX_POINTER_COORDINATE), pressed);
+        return new PointerTarget(null, integer(pointer, "x", -capture.left() - 1, -capture.left(), MAX_POINTER_COORDINATE),
+            integer(pointer, "y", -capture.top() - 1, -capture.top(), MAX_POINTER_COORDINATE), pressed);
     }
 
     private static Stack readStack(JsonElement value) {

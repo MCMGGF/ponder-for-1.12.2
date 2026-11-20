@@ -97,6 +97,8 @@ The scene timeline controls when each change appears. Pause holds the displayed 
 
 For a GUI registered with Forge, set `source.guiId` to the numeric client GUI ID. `source.mod` defaults to the block ID's namespace. The GUI handler must return a `GuiContainer` using the supplied detached world and player. Slot and property updates apply to that container. The timeline draws pointer presses.
 
+Use optional `source.capture` to include side panels drawn by the same screen outside its main GUI rectangle. Each of `left`, `top`, `right`, and `bottom` accepts an integer from 0 to 512 in GUI pixels and defaults to 0. For example, `"capture": {"left": 24, "right": 80}` adds 24 pixels to the left and 80 to the right. Pointer coordinates remain relative to the main GUI's upper-left corner. With those margins, `"pointer": {"x": -12, "y": 20}` points into the left margin.
+
 ## `gui_outline_text`
 
 Highlights a rectangle inside a parent GUI overlay and attaches text.
