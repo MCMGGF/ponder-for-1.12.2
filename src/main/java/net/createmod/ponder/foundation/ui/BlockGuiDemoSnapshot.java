@@ -1,9 +1,14 @@
 package net.createmod.ponder.foundation.ui;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import net.createmod.ponder.Ponder;
+import net.createmod.ponder.api.client.PonderNativeGuiScreens;
 import net.createmod.ponder.foundation.content.mmce.MmcePreviewSafety;
 import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition.Insets;
+import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition.Screen;
 import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition.Stack;
 import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition.State;
 import net.createmod.ponder.foundation.ui.GuiDemoDefinition.Pointer;
@@ -34,22 +39,19 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
     private static final int OUTSIDE_GUI = -4096;
 
     private final BlockGuiDemoDefinition definition;
-    private final Insets capture;
     private final int startTick;
-    private final Snapshot fallback;
-    private Snapshot snapshot;
+    private final Map<Screen, Snapshot> snapshots = new ConcurrentHashMap<>();
+    private final Set<Screen> unavailable = new HashSet<>();
+    private Screen active;
     private DetachedPonderWorld world;
     private EntityPlayerSP player;
     private GuiContainer gui;
     private State applied;
-    private boolean unavailable;
+    private float appliedTick;
 
     private BlockGuiDemoSnapshot(BlockGuiDemoDefinition definition, int startTick) {
         this.definition = definition;
-        this.capture = definition.capture();
         this.startTick = startTick;
-        fallback = captureSnapshot(176, 166);
-        snapshot = fallback;
     }
 
     static SnapshotProvider provider(BlockGuiDemoDefinition definition, int startTick) {
@@ -58,72 +60,115 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
 
     @Override
     public Snapshot provide(float tick) {
-        return Float.isFinite(tick) && tick >= startTick ? snapshot : null;
+        return visibleAt(tick) ? snapshotFor(definition.screenAt(tick - startTick)) : null;
+    }
+
+    private boolean visibleAt(float tick) {
+        return Float.isFinite(tick) && tick >= startTick;
+    }
+
+    /** Resolves native dimensions before the preview places and clips the GUI. */
+    void prepare(float tick) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (visibleAt(tick) && mc != null && mc.isCallingFromMinecraftThread()
+            && mc.getRenderItem() != null && mc.fontRenderer != null) {
+            float localTick = tick - startTick;
+            prepareScreen(mc, definition.screenAt(localTick), localTick);
+        }
+    }
+
+    private void prepareScreen(Minecraft mc, Screen screen, float localTick) {
+        if (screen.equals(active) && !needsRewindReset(localTick)) {
+            return;
+        }
+        discardScreen();
+        if (unavailable.contains(screen)) {
+            return;
+        }
+        float itemZ = mc.getRenderItem().zLevel;
+        try {
+            PreviewNativeRenderGuard.run(() -> open(mc, screen));
+            active = screen;
+        } catch (RuntimeException | LinkageError failure) {
+            markUnavailable(screen, failure);
+        } finally {
+            mc.getRenderItem().zLevel = itemZ;
+        }
+    }
+
+    private boolean needsRewindReset(float localTick) {
+        if (applied == null || localTick >= appliedTick) {
+            return false;
+        }
+        // Recreate the detached container to restore fields with no generic read method.
+        State state = definition.stateAt(localTick);
+        return !state.slots().keySet().containsAll(applied.slots().keySet())
+            || !state.properties().keySet().containsAll(applied.properties().keySet());
     }
 
     @Override
     public void render(int x, int y, int width, int height, float tick, float fade) {
         Minecraft mc = Minecraft.getMinecraft();
-        if (mc == null || width < 1 || height < 1 || provide(tick) == null || !(fade >= 4F / 255)) {
+        if (mc == null || !mc.isCallingFromMinecraftThread() || mc.getRenderItem() == null || mc.fontRenderer == null
+            || width < 1 || height < 1 || !visibleAt(tick) || !(fade >= 4F / 255)) {
             return;
         }
-        if (!unavailable) {
+        float localTick = tick - startTick;
+        Screen screen = definition.screenAt(localTick);
+        prepareScreen(mc, screen, localTick);
+        if (screen.equals(active)) {
             try {
-                PreviewNativeRenderGuard.run(() -> draw(mc, x, y, width, height, tick - startTick, fade));
+                PreviewNativeRenderGuard.run(() -> draw(mc, screen, x, y, width, height, localTick, fade));
                 return;
             } catch (RuntimeException | LinkageError failure) {
-                discardScreen();
-                snapshot = fallback;
-                unavailable = true;
-                Ponder.LOGGER.warn("Could not render Ponder native GUI for {}", definition.block(), failure);
+                markUnavailable(screen, failure);
             }
         }
         SandboxTriggeredBlockGuiSnapshot.renderUnavailable(x, y, width, height, definition.block().toString());
     }
 
-    private void draw(Minecraft mc, int x, int y, int width, int height, float localTick, float fade) {
+    private void draw(Minecraft mc, Screen screen, int x, int y, int width, int height, float localTick, float fade) {
         State state = definition.stateAt(localTick);
-        if (applied != null && (!state.slots().keySet().containsAll(applied.slots().keySet())
-            || !state.properties().keySet().containsAll(applied.properties().keySet()))) {
-            // Recreate the original container to restore fields with no generic read method.
-            discardScreen();
-        }
-        if (gui == null) {
-            open(mc);
-        }
         float itemZ = mc.getRenderItem().zLevel;
         try (NativeGuiPreviewScope ignored = new NativeGuiPreviewScope(mc, player)) {
             if (!state.equals(applied)) {
                 apply(state);
                 applied = state;
             }
-            int captureWidth = snapshot.displayWidth;
-            int captureHeight = snapshot.displayHeight;
-            float scale = Math.min(width / (float) captureWidth, height / (float) captureHeight);
-            GlStateManager.matrixMode(GL11.GL_MODELVIEW);
-            GlStateManager.translate(x + (width - captureWidth * scale) / 2F,
-                y + (height - captureHeight * scale) / 2F, 0);
-            GlStateManager.scale(scale, scale, 1);
-            // The scene layout clips to the full capture. Native widgets and pointer targets still use the base GUI.
-            GlStateManager.translate(capture.left() - gui.getGuiLeft(), capture.top() - gui.getGuiTop(), 0);
-            GlStateManager.disableDepth();
-            GlStateManager.depthMask(false);
-            GlStateManager.color(1, 1, 1, 1);
-            gui.drawScreen(OUTSIDE_GUI, OUTSIDE_GUI, localTick - (float) Math.floor(localTick));
-            GlStateManager.disableDepth();
-            GlStateManager.disableLighting();
-            GlStateManager.disableAlpha();
-            GlStateManager.translate(gui.getGuiLeft(), gui.getGuiTop(), 0);
-            Pointer pointer = definition.pointerAt(localTick, this::slotCenter);
-            if (pointer != null) {
-                GuiDemoSnapshot.drawPointer(pointer, Math.min(1, fade));
-            }
+            appliedTick = localTick;
+            drawScreen(screen, x, y, width, height, localTick, fade);
         } finally {
             mc.getRenderItem().zLevel = itemZ;
         }
     }
 
-    private void open(Minecraft mc) {
+    private void drawScreen(Screen screen, int x, int y, int width, int height, float localTick, float fade) {
+        Snapshot snapshot = snapshotFor(screen);
+        int captureWidth = snapshot.displayWidth;
+        int captureHeight = snapshot.displayHeight;
+        float scale = Math.min(width / (float) captureWidth, height / (float) captureHeight);
+        GlStateManager.matrixMode(GL11.GL_MODELVIEW);
+        GlStateManager.translate(x + (width - captureWidth * scale) / 2F,
+            y + (height - captureHeight * scale) / 2F, 0);
+        GlStateManager.scale(scale, scale, 1);
+        // The scene layout clips to the full capture. Native widgets and pointer targets still use the base GUI.
+        Insets capture = screen.capture();
+        GlStateManager.translate(capture.left() - gui.getGuiLeft(), capture.top() - gui.getGuiTop(), 0);
+        GlStateManager.disableDepth();
+        GlStateManager.depthMask(false);
+        GlStateManager.color(1, 1, 1, 1);
+        gui.drawScreen(OUTSIDE_GUI, OUTSIDE_GUI, localTick - (float) Math.floor(localTick));
+        GlStateManager.disableDepth();
+        GlStateManager.disableLighting();
+        GlStateManager.disableAlpha();
+        GlStateManager.translate(gui.getGuiLeft(), gui.getGuiTop(), 0);
+        Pointer pointer = definition.pointerAt(localTick, this::slotCenter);
+        if (pointer != null) {
+            GuiDemoSnapshot.drawPointer(pointer, Math.min(1, fade));
+        }
+    }
+
+    private void open(Minecraft mc, Screen screen) {
         Block block = Block.REGISTRY.getObject(definition.block());
         if (block == null || !definition.block().equals(block.getRegistryName())
             || MmcePreviewSafety.isNativeControllerBlock(block.getClass())) {
@@ -134,7 +179,15 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
         player = NativeGuiPreviewScope.player(mc, world);
         player.setPosition(POS.getX() + 0.5, POS.getY() + 0.5, POS.getZ() + 0.5);
         try (NativeGuiPreviewScope scope = new NativeGuiPreviewScope(mc, player)) {
-            gui = definition.guiId() == null ? vanillaScreen(scope) : forgeScreen();
+            if (screen.factory() != null) {
+                PonderNativeGuiScreens.Factory factory = PonderNativeGuiScreens.get(screen.factory());
+                if (factory == null) {
+                    throw new IllegalArgumentException("Unknown native GUI factory " + screen.factory());
+                }
+                gui = factory.create(world, POS, player);
+            } else {
+                gui = screen.guiId() == null ? vanillaScreen(scope) : forgeScreen(screen);
+            }
             if (gui == null) {
                 throw new IllegalArgumentException("Block did not expose a client GuiContainer");
             }
@@ -148,11 +201,16 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
             if (width < 1 || height < 1) {
                 throw new IllegalArgumentException("Native GUI has invalid dimensions");
             }
-            snapshot = captureSnapshot(width, height);
+            snapshots.put(screen, captureSnapshot(screen, width, height));
         }
     }
 
-    private Snapshot captureSnapshot(int guiWidth, int guiHeight) {
+    private Snapshot snapshotFor(Screen screen) {
+        return snapshots.computeIfAbsent(screen, key -> captureSnapshot(key, 176, 166));
+    }
+
+    private Snapshot captureSnapshot(Screen screen, int guiWidth, int guiHeight) {
+        Insets capture = screen.capture();
         int width = Math.addExact(guiWidth, capture.left() + capture.right());
         int height = Math.addExact(guiHeight, capture.top() + capture.bottom());
         return Snapshot.liveRenderer(width, height, false, this);
@@ -168,12 +226,12 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
         return scope.captured();
     }
 
-    private GuiContainer forgeScreen() {
-        ModContainer mod = Loader.instance().getIndexedModList().get(definition.guiModId());
+    private GuiContainer forgeScreen(Screen screen) {
+        ModContainer mod = Loader.instance().getIndexedModList().get(screen.guiModId());
         if (mod == null) {
             return null;
         }
-        Object result = NetworkRegistry.INSTANCE.getLocalGuiContainer(mod, player, definition.guiId(), world,
+        Object result = NetworkRegistry.INSTANCE.getLocalGuiContainer(mod, player, screen.guiId(), world,
             POS.getX(), POS.getY(), POS.getZ());
         return result instanceof GuiContainer container ? container : null;
     }
@@ -220,11 +278,19 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
     @Override
     public void reset() {
         discardScreen();
-        snapshot = fallback;
-        unavailable = false;
+        snapshots.clear();
+        unavailable.clear();
+    }
+
+    private void markUnavailable(Screen screen, Throwable failure) {
+        discardScreen();
+        if (unavailable.add(screen)) {
+            Ponder.LOGGER.warn("Could not render Ponder native GUI screen {} for {}", screen.name(), definition.block(), failure);
+        }
     }
 
     private void discardScreen() {
+        active = null;
         gui = null;
         player = null;
         applied = null;

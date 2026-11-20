@@ -99,6 +99,10 @@ For a GUI registered with Forge, set `source.guiId` to the numeric client GUI ID
 
 Use optional `source.capture` to include side panels drawn by the same screen outside its main GUI rectangle. Each of `left`, `top`, `right`, and `bottom` accepts an integer from 0 to 512 in GUI pixels and defaults to 0. For example, `"capture": {"left": 24, "right": 80}` adds 24 pixels to the left and 80 to the right. Pointer coordinates remain relative to the main GUI's upper-left corner. With those margins, `"pointer": {"x": -12, "y": 20}` points into the left margin.
 
+For a native block GUI demo, use `screens` to name additional views of the same sandbox block and tile. A view can set `guiId` and `mod` for a Forge GUI, or `factory` for a registered preview factory identified by a resource ID. These options also apply to `source`. Additional views inherit the main view's GUI resolver and capture bounds when their definitions omit the corresponding options. Set `screen` in a keyframe to switch views on that tick, or use `"screen": "main"` to return to the original view. A keyframe without `screen` continues on the active view.
+
+Each view retains its own scripted slots, properties, and pointer state. Pointer movement is interpolated within each visit to a view. The optional AE2S example uses a separate preview adapter for the Inscriber's Output Sides screen. [AE2S Inscriber example](../../../../examples/gui_demo/optional/ae2s/config/ponder/ponder_demo/ae2s_inscriber_subgui.json)
+
 ## `gui_outline_text`
 
 Highlights a rectangle inside a parent GUI overlay and attaches text.

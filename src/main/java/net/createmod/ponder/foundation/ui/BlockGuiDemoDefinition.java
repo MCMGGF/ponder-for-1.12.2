@@ -11,6 +11,7 @@ import static net.createmod.ponder.foundation.ui.GuiDemoDefinition.string;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
@@ -23,8 +24,9 @@ import net.minecraft.nbt.NBTException;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 
-/** Slot and property keyframes on a detached native block GUI. */
+/** Screen, slot and property keyframes on a detached native block GUI. */
 public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
+    private static final String MAIN_SCREEN = "main";
     private static final int MAX_DEMO_TICK = 23_999;
     private static final int MAX_SLOT = 4095;
     private static final int MAX_POINTER_COORDINATE = 4095;
@@ -47,6 +49,29 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     record State(Map<Integer, Stack> slots, Map<Integer, Integer> properties) {
     }
 
+    record Screen(String name, Integer guiId, String guiModId, ResourceLocation factory, Insets capture) {
+    }
+
+    private static final class ScreenTracks {
+        private final Screen screen;
+        private final Map<Integer, NavigableMap<Integer, Stack>> slots = new TreeMap<>();
+        private final Map<Integer, NavigableMap<Integer, Integer>> properties = new TreeMap<>();
+        private final NavigableMap<Integer, PointerTarget> pointers = new TreeMap<>();
+
+        private ScreenTracks(Screen screen) {
+            this.screen = screen;
+        }
+
+        private void readUpdates(JsonObject frame, int tick) {
+            readTrackUpdates(frame, "slots", MAX_SLOT, tick, slots, BlockGuiDemoDefinition::readStack);
+            readTrackUpdates(frame, "properties", Integer.MAX_VALUE, tick, properties,
+                value -> integer(value, "property value", 0, Integer.MIN_VALUE, Integer.MAX_VALUE));
+            if (frame.has("pointer")) {
+                pointers.put(tick, readPointer(frame.get("pointer"), screen.capture()));
+            }
+        }
+    }
+
     private record PointerTarget(Integer slot, int x, int y, boolean pressed) {
         Pointer resolve(Function<Integer, Pointer> slotCenter) {
             if (slot == null) {
@@ -60,38 +85,33 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     private final ResourceLocation block;
     private final int meta;
     private final NBTTagCompound tileNbt;
-    private final Integer guiId;
-    private final String guiModId;
-    private final Insets capture;
-    private final NavigableMap<Integer, NavigableMap<Integer, Stack>> slots = new TreeMap<>();
-    private final NavigableMap<Integer, NavigableMap<Integer, Integer>> properties = new TreeMap<>();
-    private final NavigableMap<Integer, PointerTarget> pointers = new TreeMap<>();
+    private final ScreenTracks main;
+    private final NavigableMap<Integer, ScreenTracks> screenChanges = new TreeMap<>();
     private final int lastKeyframeTick;
 
-    private BlockGuiDemoDefinition(JsonObject source, NavigableMap<Integer, JsonObject> frames) {
+    private BlockGuiDemoDefinition(JsonObject source, JsonElement screens, NavigableMap<Integer, JsonObject> frames) {
         block = requiredResource(source, "block");
         meta = integer(source, "meta", 0, 0, 15);
         tileNbt = nbt(source, "tileNbt");
-        if (!source.has("guiId") && source.has("mod")) {
-            throw new IllegalArgumentException("source.mod requires source.guiId");
-        }
-        guiId = source.has("guiId") ? integer(source, "guiId", 0, Integer.MIN_VALUE, Integer.MAX_VALUE) : null;
-        guiModId = string(source, "mod", block.getNamespace());
-        capture = readCapture(source.get("capture"));
-        if (!guiModId.matches("[a-z0-9_.-]+") || guiModId.equals(".") || guiModId.equals("..")) {
-            throw new IllegalArgumentException("source.mod must be a mod id");
-        }
+        Screen defaults = new Screen(MAIN_SCREEN, null, block.getNamespace(), null, Insets.NONE);
+        main = new ScreenTracks(readScreen(source, MAIN_SCREEN, "source", defaults));
+        Map<String, ScreenTracks> tracksByScreen = readScreens(screens, main);
 
+        ScreenTracks active = main;
         for (Map.Entry<Integer, JsonObject> entry : frames.entrySet()) {
             int tick = entry.getKey();
             JsonObject frame = entry.getValue();
             try {
-                readTrackUpdates(frame, "slots", MAX_SLOT, tick, slots, BlockGuiDemoDefinition::readStack);
-                readTrackUpdates(frame, "properties", Integer.MAX_VALUE, tick, properties,
-                    value -> integer(value, "property value", 0, Integer.MIN_VALUE, Integer.MAX_VALUE));
-                if (frame.has("pointer")) {
-                    pointers.put(tick, readPointer(frame.get("pointer"), capture));
+                String name = string(frame, "screen", active.screen.name());
+                ScreenTracks selected = tracksByScreen.get(name);
+                if (selected == null) {
+                    throw new IllegalArgumentException("Unknown screen: " + name);
                 }
+                if (selected != active) {
+                    screenChanges.put(tick, selected);
+                    active = selected;
+                }
+                active.readUpdates(frame, tick);
             } catch (IllegalArgumentException invalid) {
                 throw new IllegalArgumentException("Keyframe " + tick + ": " + invalid.getMessage(), invalid);
             }
@@ -100,15 +120,15 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     }
 
     public static BlockGuiDemoDefinition parse(JsonObject root) {
-        fields(root, Set.of("source", "keyframes"));
+        fields(root, Set.of("source", "screens", "keyframes"));
         JsonObject source = object(root.get("source"), "source");
-        fields(source, Set.of("type", "block", "meta", "tileNbt", "guiId", "mod", "capture"));
+        fields(source, Set.of("type", "block", "meta", "tileNbt", "guiId", "mod", "factory", "capture"));
         if (!"block_gui".equals(string(source, "type", ""))) {
             throw new IllegalArgumentException("GUI demo source.type must be block_gui");
         }
 
-        return new BlockGuiDemoDefinition(source,
-            keyframes(root, Set.of("tick", "slots", "properties", "pointer"), MAX_DEMO_TICK));
+        return new BlockGuiDemoDefinition(source, root.get("screens"),
+            keyframes(root, Set.of("tick", "screen", "slots", "properties", "pointer"), MAX_DEMO_TICK));
     }
 
     @Override
@@ -134,30 +154,43 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     }
 
     Integer guiId() {
-        return guiId;
+        return main.screen.guiId();
     }
 
     String guiModId() {
-        return guiModId;
+        return main.screen.guiModId();
     }
 
     Insets capture() {
-        return capture;
+        return main.screen.capture();
+    }
+
+    Screen screenAt(float tick) {
+        return tracksAt((int) Math.floor(tick)).screen;
     }
 
     State stateAt(float tick) {
         int wholeTick = (int) Math.floor(tick);
-        return new State(valuesAt(slots, wholeTick), valuesAt(properties, wholeTick));
+        ScreenTracks tracks = tracksAt(wholeTick);
+        return new State(valuesAt(tracks.slots, wholeTick), valuesAt(tracks.properties, wholeTick));
     }
 
     Pointer pointerAt(float tick, Function<Integer, Pointer> slotCenter) {
         int wholeTick = (int) Math.floor(tick);
+        Map.Entry<Integer, ScreenTracks> visit = screenChanges.floorEntry(wholeTick);
+        NavigableMap<Integer, PointerTarget> pointers = (visit == null ? main : visit.getValue()).pointers;
         Map.Entry<Integer, PointerTarget> before = pointers.floorEntry(wholeTick);
         Pointer start = resolvePointer(before, slotCenter);
         if (start == null) {
             return null;
         }
         Map.Entry<Integer, PointerTarget> after = pointers.higherEntry(wholeTick);
+        Integer nextSwitch = screenChanges.higherKey(wholeTick);
+        // A returning screen keeps its pointer, and motion starts with targets authored in this visit.
+        if (after == null || (visit != null && before.getKey() < visit.getKey())
+            || (nextSwitch != null && after.getKey() >= nextSwitch)) {
+            return start;
+        }
         Pointer end = resolvePointer(after, slotCenter);
         if (end == null) {
             return start;
@@ -166,22 +199,75 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
         return GuiDemoDefinition.interpolatePointer(start, end, fraction);
     }
 
+    private ScreenTracks tracksAt(int tick) {
+        Map.Entry<Integer, ScreenTracks> entry = screenChanges.floorEntry(tick);
+        return entry == null ? main : entry.getValue();
+    }
+
+    private Map<String, ScreenTracks> readScreens(JsonElement value, ScreenTracks main) {
+        Map<String, ScreenTracks> screens = new HashMap<>();
+        screens.put(MAIN_SCREEN, main);
+        if (value == null) {
+            return screens;
+        }
+        for (Map.Entry<String, JsonElement> entry : object(value, "screens").entrySet()) {
+            String name = entry.getKey();
+            if (name.isBlank() || name.length() > 512 || MAIN_SCREEN.equals(name)) {
+                throw new IllegalArgumentException("Invalid screen name: " + name);
+            }
+            String path = "screens." + name;
+            JsonObject definition = object(entry.getValue(), path);
+            try {
+                fields(definition, Set.of("guiId", "mod", "factory", "capture"));
+            } catch (IllegalArgumentException invalid) {
+                throw new IllegalArgumentException(path + ": " + invalid.getMessage(), invalid);
+            }
+            screens.put(name, new ScreenTracks(readScreen(definition, name, path, main.screen)));
+        }
+        return screens;
+    }
+
+    private Screen readScreen(JsonObject definition, String name, String path, Screen defaults) {
+        Insets capture = definition.has("capture")
+            ? readCapture(definition.get("capture"), path + ".capture") : defaults.capture();
+        if (definition.has("factory")) {
+            if (definition.has("guiId") || definition.has("mod")) {
+                throw new IllegalArgumentException(path + ".factory cannot be combined with guiId or mod");
+            }
+            ResourceLocation factory = requiredResource(definition, "factory");
+            return new Screen(name, null, null, factory, capture);
+        }
+        if (defaults.factory() != null && !definition.has("guiId") && !definition.has("mod")) {
+            return new Screen(name, null, null, defaults.factory(), capture);
+        }
+        Integer guiId = defaults.guiId();
+        if (definition.has("guiId")) {
+            guiId = integer(definition.get("guiId"), path + ".guiId", 0, Integer.MIN_VALUE, Integer.MAX_VALUE);
+        }
+        if (guiId == null && definition.has("mod")) {
+            throw new IllegalArgumentException(path + ".mod requires " + path + ".guiId");
+        }
+        String mod = string(definition, "mod",
+            defaults.guiModId() == null ? block.getNamespace() : defaults.guiModId());
+        if (!mod.matches("[a-z0-9_.-]+") || mod.equals(".") || mod.equals("..")) {
+            throw new IllegalArgumentException(path + ".mod must be a mod id");
+        }
+        return new Screen(name, guiId, mod, null, capture);
+    }
+
     private static Pointer resolvePointer(Map.Entry<Integer, PointerTarget> entry,
         Function<Integer, Pointer> slotCenter) {
         return entry == null || entry.getValue() == null ? null : entry.getValue().resolve(slotCenter);
     }
 
-    private static Insets readCapture(JsonElement value) {
-        if (value == null) {
-            return Insets.NONE;
-        }
-        JsonObject capture = object(value, "source.capture");
+    private static Insets readCapture(JsonElement value, String path) {
+        JsonObject capture = object(value, path);
         fields(capture, Set.of("left", "top", "right", "bottom"));
         return new Insets(
-            integer(capture.get("left"), "source.capture.left", 0, 0, MAX_CAPTURE_MARGIN),
-            integer(capture.get("top"), "source.capture.top", 0, 0, MAX_CAPTURE_MARGIN),
-            integer(capture.get("right"), "source.capture.right", 0, 0, MAX_CAPTURE_MARGIN),
-            integer(capture.get("bottom"), "source.capture.bottom", 0, 0, MAX_CAPTURE_MARGIN));
+            integer(capture.get("left"), path + ".left", 0, 0, MAX_CAPTURE_MARGIN),
+            integer(capture.get("top"), path + ".top", 0, 0, MAX_CAPTURE_MARGIN),
+            integer(capture.get("right"), path + ".right", 0, 0, MAX_CAPTURE_MARGIN),
+            integer(capture.get("bottom"), path + ".bottom", 0, 0, MAX_CAPTURE_MARGIN));
     }
 
     private static PointerTarget readPointer(JsonElement value, Insets capture) {

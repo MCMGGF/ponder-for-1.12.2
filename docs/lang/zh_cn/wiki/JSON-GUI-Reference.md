@@ -99,6 +99,10 @@
 }
 ```
 
+原生方块 GUI 演示可用 `screens` 为同一沙盒方块及其方块实体定义附加界面。界面可用 `guiId` 和 `mod` 指定 Forge GUI，或用 `factory` 填写已注册的预览工厂资源 ID。`source` 也支持这些选项。附加界面省略界面来源或 `capture` 时，沿用主界面的对应设置。在关键帧中填写 `screen` 可从该 tick 起切换，填写 `"screen": "main"` 返回主界面，省略 `screen` 则沿用当前界面。
+
+各界面分别保留脚本设置的槽位、属性与指针状态。指针只在一次停留于同一界面的期间插值移动。可选的 AE2S 示例通过独立预览适配器展示铭刻器的输出侧面界面。[AE2S 铭刻器示例](../../../../examples/gui_demo/optional/ae2s/config/ponder/ponder_demo/ae2s_inscriber_subgui.json)
+
 ## `gui_outline_text`
 
 在父 GUI 叠层内部高亮一个矩形区域，并绑定说明文字。

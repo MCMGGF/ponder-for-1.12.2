@@ -4514,6 +4514,7 @@ public class PonderDebugScreen extends CompatGuiScreen {
     private PonderGuiSnapshotRegistry.Snapshot resolveSnapshot(PonderScene.OverlayEvent event, float tick) {
         PonderGuiSnapshotRegistry.SnapshotProvider provider = PonderGuiSnapshotRegistry.providerFor(event);
         if (provider != null) usedSnapshotProviders.add(provider);
+        if (provider instanceof BlockGuiDemoSnapshot nativeGui) nativeGui.prepare(tick);
         return PonderGuiSnapshotRegistry.resolve(event, tick);
     }
 

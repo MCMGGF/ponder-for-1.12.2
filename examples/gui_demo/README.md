@@ -20,6 +20,21 @@
 
 该场景的 `show_gui_demo` 内联定义通过 `source.type: "block_gui"` 打开原版熔炉界面。在关键帧中，`slots` 使用原版熔炉容器槽位编号 0（输入）、1（燃料）和 2（输出）。`properties` 使用容器属性编号 0（剩余燃烧时间）、1（总燃烧时间）、2（已烧炼时间）和 3（所需烧炼时间）。场景 JSON 直接安排状态变化，所以每次重播都按相同时间展示。
 
+## AE2S 铭刻器与输出侧面（可选）
+
+1. 在安装了 Applied Energistics 2 Supergiant 1.1.2 和 Ponder Legacy 的客户端中，将可选的 Ponder AE2S Preview 适配器 JAR 放进 `mods`。从源码构建适配器时，在仓库根目录执行下面的 PowerShell 命令，替换 Ponder 开发版 JAR 路径。从本地指定 AE2S JAR 时，在命令末尾追加 `"-Pae2sJar=<AE2S 1.1.2 JAR 路径>"`。
+
+   ```powershell
+   .\gradlew.bat -p examples/gui_demo/optional/ae2s assemble "-PponderDevJar=<Ponder 开发版 JAR 路径>"
+   ```
+
+   构建产物位于 `examples/gui_demo/optional/ae2s/build/libs`。
+2. 将 [ae2s_inscriber_subgui.json](optional/ae2s/config/ponder/ponder_demo/ae2s_inscriber_subgui.json) 复制到游戏实例的 `config/ponder/ponder_demo`。
+3. 进入单人世界，执行 `/ponder reload`，再执行 `/ponderui ponder_demo:ae2s_inscriber_subgui 0`。
+4. 主界面装入硅压印模板和硅。叠层出现后第 110 tick 切换到 AE2S 的输出侧面界面，第 225 tick 返回主界面，模板与硅仍在原槽位。第 270 tick 显示压印硅，第 330 tick 取走压印硅。可以在两次切换前后暂停或拖动时间轴，核对对应的界面和槽位。
+
+`source.factory` 和 `screens.output_sides.factory` 引用适配器注册的界面工厂。`source.tileNbt` 开启自动输出，使铭刻器主界面显示输出侧面按钮。子界面的 `capture.top` 包含超出界面顶边的返回按钮。
+
 ## 资源包熔炼工作台
 
 示例适用于安装了含 GUI 演示功能的 Ponder Legacy 的 Minecraft 1.12.2 客户端。场景用原版熔炉、铁矿石、煤炭和铁锭，界面背景随资源包提供。

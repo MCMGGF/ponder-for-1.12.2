@@ -1,0 +1,74 @@
+{
+  "namespace": "ponder_demo",
+  "scenes": [
+    {
+      "component": "ae2:inscriber",
+      "componentKey": "ponder_demo:ae2s_inscriber_subgui",
+      "schematic": "ponder_legacy:mmce/empty",
+      "sceneId": "ae2s_inscriber_subgui",
+      "title": "AE2S Inscriber Output Sides",
+      "operations": [
+        { "type": "base_plate", "xOffset": 0, "zOffset": 0, "size": 5 },
+        { "type": "show_base_plate" },
+        { "type": "set_blocks", "from": [0, 0, 0], "to": [4, 0, 4], "state": "minecraft:stonebrick" },
+        { "type": "set_block", "pos": [2, 1, 2], "state": "ae2:inscriber" },
+        { "type": "idle", "ticks": 20 },
+        {
+          "type": "show_gui_demo",
+          "id": "inscriber",
+          "duration": 360,
+          "demo": {
+            "source": {
+              "type": "block_gui",
+              "block": "ae2:inscriber",
+              "factory": "ponder_ae2s_preview:inscriber",
+              "tileNbt": "{auto_export:\"YES\"}",
+              "capture": { "left": 24, "right": 24 }
+            },
+            "screens": {
+              "output_sides": {
+                "factory": "ponder_ae2s_preview:output_sides",
+                "capture": { "top": 8 }
+              }
+            },
+            "keyframes": [
+              { "tick": 0, "pointer": { "slot": 41 } },
+              {
+                "tick": 30,
+                "slots": { "41": { "item": "ae2:silicon_press" } },
+                "pointer": { "slot": 41, "pressed": true }
+              },
+              { "tick": 34, "pointer": { "slot": 41 } },
+              { "tick": 55, "pointer": { "slot": 43 } },
+              {
+                "tick": 65,
+                "slots": { "43": { "item": "ae2:silicon" } },
+                "pointer": { "slot": 43, "pressed": true }
+              },
+              { "tick": 69, "pointer": { "slot": 43 } },
+              { "tick": 82, "pointer": { "x": -7, "y": 77 } },
+              { "tick": 104, "pointer": { "x": -7, "y": 77, "pressed": true } },
+              { "tick": 110, "screen": "output_sides", "pointer": { "x": 46, "y": 24 } },
+              { "tick": 160, "pointer": { "x": 66, "y": 46 } },
+              { "tick": 212, "pointer": { "x": 79, "y": 5 } },
+              { "tick": 220, "pointer": { "x": 79, "y": 5, "pressed": true } },
+              { "tick": 225, "screen": "main", "pointer": { "slot": 43 } },
+              { "tick": 254, "pointer": { "slot": 44 } },
+              {
+                "tick": 270,
+                "slots": { "43": null, "44": { "item": "ae2:printed_silicon" } }
+              },
+              { "tick": 330, "slots": { "44": null }, "pointer": { "slot": 44, "pressed": true } },
+              { "tick": 334, "pointer": { "slot": 44 } },
+              { "tick": 345, "pointer": null }
+            ]
+          }
+        },
+        { "type": "idle", "ticks": 360 },
+        { "type": "hide_gui_demo", "id": "inscriber" },
+        { "type": "idle", "ticks": 20 },
+        { "type": "mark_finished" }
+      ]
+    }
+  ]
+}

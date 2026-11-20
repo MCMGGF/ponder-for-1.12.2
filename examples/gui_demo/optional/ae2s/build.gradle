@@ -1,0 +1,68 @@
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.16-kappa'
+}
+
+group = 'net.createmod.ponder.example'
+version = '1.0.0'
+base.archivesName = 'ponder_ae2s_preview'
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+}
+
+def ae2sVersion = '1.1.2'
+def ae2sJar = providers.gradleProperty('ae2sJar')
+def ponderDevJar = providers.gradleProperty('ponderDevJar')
+    .map { file(it) }
+    .orElse(file('../../../../build/dev-libs/ponder_legacy-0.3.7-beta-dev.jar'))
+
+repositories {
+    mavenCentral()
+    maven {
+        url = 'https://cursemaven.com'
+        content { includeGroup('curse.maven') }
+    }
+    ivy {
+        url = "https://github.com/FormlessDragon/Applied-Energistics-2-Supergiant/releases/download/v${ae2sVersion}"
+        patternLayout { artifact('[artifact]-[revision](-[classifier]).[ext]') }
+        metadataSources { artifact() }
+        content { includeGroup('dev.ae2s') }
+    }
+}
+
+configurations {
+    modCompileOnly
+    compileOnly.extendsFrom(modCompileOnly)
+}
+
+unimined.minecraft {
+    version '1.12.2'
+    mappings { mcp('stable', '39-1.12') }
+    cleanroom { loader '0.5.6-alpha' }
+    mods { remap(configurations.modCompileOnly) }
+}
+
+dependencies {
+    compileOnly files(ponderDevJar)
+    compileOnly 'curse.maven:mouse-tweaks-unofficial-461660:5876158'
+    if (ae2sJar.isPresent()) {
+        modCompileOnly files(ae2sJar.map { file(it) })
+    } else {
+        modCompileOnly "dev.ae2s:AppliedEnergistics2-Supergiant:${ae2sVersion}:dev@jar"
+    }
+}
+
+tasks.named('compileJava', JavaCompile) {
+    options.release = 25
+    options.encoding = 'UTF-8'
+    doFirst {
+        if (!ponderDevJar.get().isFile()) {
+            throw new GradleException("Build Ponder's development JAR or supply -PponderDevJar.")
+        }
+    }
+}
+
+tasks.named('jar', Jar) {
+    manifest { attributes('ModType': 'CRL') }
+}
