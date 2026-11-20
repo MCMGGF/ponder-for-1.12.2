@@ -9,6 +9,8 @@
 - `gui_outline_text`
 - `gui_interaction`
 - `interactionDefinitions`
+- `show_gui_demo`
+- `hide_gui_demo`
 
 ## `gui_texture`
 
@@ -68,6 +70,30 @@
 - `nbt`：打开 GUI 前合并到沙盒 TileEntity 的 NBT
 - `id`：叠层 id，供 `gui_outline_text` 引用
 - `pointAt`、`placeNearTarget`、`independentY`、`offsetX`、`offsetY`
+
+## `show_gui_demo` / `hide_gui_demo`
+
+在 `show_gui_demo` 中设置叠层 `id`、以 tick 计的 `duration` 和 `demo` 定义。`demo` 可以内联，也可以通过资源 ID 引用 `assets/<namespace>/ponder/gui_demos/<path>.json`。用相同的叠层 `id` 调用 `hide_gui_demo` 可提前关闭界面。
+
+将 `source.type` 设为 `block_gui` 可渲染方块的真实容器界面。`source.block` 为方块注册 ID。`source.meta` 可省略，默认为 0。`source.tileNbt` 可选，用 SNBT 提供方块实体初始数据。
+
+关键帧的 `tick` 相对于叠层开始时间。`slots` 以容器槽位编号为键，值是包含 `item` 注册 ID 的物品栈，也可指定 `count`、`meta` 和物品 `nbt`。用 `null` 清空槽位。`properties` 以容器属性编号为键，值为整数。槽位和属性编号由各机器容器定义。关键帧省略的字段沿用已有状态。`pointer` 可通过 `slot` 指向槽位，或使用 GUI 内的 `x`、`y` 坐标定位，也可指定 `pressed`。用 `pointer: null` 隐藏指针。
+
+场景时间轴决定每次变化何时显示。暂停时保持当前状态，回退时恢复到所选 tick 的状态。指针演示脚本安排的操作。下面的例子向原版熔炉输入槽放入铁矿石，燃料、进度和出料见[完整示例](../../../../examples/gui_demo/config/ponder/ponder_demo/vanilla_furnace.json)。
+
+```json
+{
+  "type": "show_gui_demo",
+  "id": "furnace",
+  "duration": 80,
+  "demo": {
+    "source": { "type": "block_gui", "block": "minecraft:furnace" },
+    "keyframes": [
+      { "tick": 20, "slots": { "0": { "item": "minecraft:iron_ore" } }, "pointer": { "slot": 0 } }
+    ]
+  }
+}
+```
 
 ## `gui_outline_text`
 

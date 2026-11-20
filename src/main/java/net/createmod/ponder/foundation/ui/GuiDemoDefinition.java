@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 import net.minecraft.util.ResourceLocation;
 
 /** A draw-only layout and its tracks, measured in ticks from the GUI overlay's start. */
-public final class GuiDemoDefinition {
+public final class GuiDemoDefinition implements GuiDemoTimeline {
     private static final int MAX_SIZE = 1024;
     private static final int MAX_TICK = 1_000_000;
     private static final Pattern ID = Pattern.compile("[a-zA-Z0-9_-]{1,64}");
@@ -91,15 +91,7 @@ public final class GuiDemoDefinition {
             widgets.put(id, widget(data, width, height));
         }
 
-        NavigableMap<Integer, JsonObject> frames = new TreeMap<>();
-        for (JsonElement value : array(root, "keyframes", 4096)) {
-            JsonObject frame = object(value, "keyframe");
-            fields(frame, Set.of("tick", "pointer", "updates"));
-            int tick = integer(frame, "tick", -1, 0, MAX_TICK);
-            if (frames.putIfAbsent(tick, frame) != null) {
-                throw new IllegalArgumentException("Duplicate keyframe tick: " + tick);
-            }
-        }
+        NavigableMap<Integer, JsonObject> frames = keyframes(root, Set.of("tick", "pointer", "updates"), MAX_TICK);
 
         NavigableMap<Integer, Pointer> pointers = new TreeMap<>();
         for (Map.Entry<Integer, JsonObject> entry : frames.entrySet()) {
@@ -138,8 +130,14 @@ public final class GuiDemoDefinition {
         return height;
     }
 
+    @Override
     public int lastKeyframeTick() {
         return lastKeyframeTick;
+    }
+
+    @Override
+    public PonderGuiSnapshotRegistry.SnapshotProvider provider(int startTick) {
+        return GuiDemoSnapshot.provider(this, startTick);
     }
 
     ResourceLocation background() {
@@ -163,8 +161,25 @@ public final class GuiDemoDefinition {
         }
         Pointer end = after.getValue();
         float fraction = (tick - before.getKey()) / (after.getKey() - before.getKey());
+        return interpolatePointer(start, end, fraction);
+    }
+
+    static Pointer interpolatePointer(Pointer start, Pointer end, float fraction) {
         return new Pointer(start.x() + (end.x() - start.x()) * fraction,
             start.y() + (end.y() - start.y()) * fraction, start.pressed());
+    }
+
+    static NavigableMap<Integer, JsonObject> keyframes(JsonObject root, Set<String> allowed, int maxTick) {
+        NavigableMap<Integer, JsonObject> frames = new TreeMap<>();
+        for (JsonElement value : array(root, "keyframes", 4096)) {
+            JsonObject frame = object(value, "keyframe");
+            fields(frame, allowed);
+            int tick = integer(frame, "tick", -1, 0, maxTick);
+            if (frames.putIfAbsent(tick, frame) != null) {
+                throw new IllegalArgumentException("Duplicate keyframe tick: " + tick);
+            }
+        }
+        return frames;
     }
 
     private static Widget widget(JsonObject data, int canvasWidth, int canvasHeight) {
@@ -241,7 +256,7 @@ public final class GuiDemoDefinition {
         }
     }
 
-    private static void fields(JsonObject data, Set<String> allowed) {
+    static void fields(JsonObject data, Set<String> allowed) {
         for (Map.Entry<String, JsonElement> entry : data.entrySet()) {
             if (!allowed.contains(entry.getKey())) {
                 throw new IllegalArgumentException("Unknown field: " + entry.getKey());
@@ -249,8 +264,8 @@ public final class GuiDemoDefinition {
         }
     }
 
-    private static JsonObject object(JsonElement value, String name) {
-        if (!value.isJsonObject()) {
+    static JsonObject object(JsonElement value, String name) {
+        if (value == null || !value.isJsonObject()) {
             throw new IllegalArgumentException(name + " must be an object");
         }
         return value.getAsJsonObject();
@@ -267,7 +282,7 @@ public final class GuiDemoDefinition {
         return value.getAsJsonArray();
     }
 
-    private static String string(JsonObject data, String key, String fallback) {
+    static String string(JsonObject data, String key, String fallback) {
         JsonElement value = data.get(key);
         if (value == null) {
             return fallback;
@@ -278,7 +293,7 @@ public final class GuiDemoDefinition {
         return value.getAsString();
     }
 
-    private static boolean bool(JsonObject data, String key, boolean fallback) {
+    static boolean bool(JsonObject data, String key, boolean fallback) {
         JsonElement value = data.get(key);
         if (value == null) {
             return fallback;
@@ -289,9 +304,12 @@ public final class GuiDemoDefinition {
         return value.getAsBoolean();
     }
 
-    private static int integer(JsonObject data, String key, int fallback, int min, int max) {
+    static int integer(JsonObject data, String key, int fallback, int min, int max) {
+        return integer(data.get(key), key, fallback, min, max);
+    }
+
+    static int integer(JsonElement value, String key, int fallback, int min, int max) {
         int result = fallback;
-        JsonElement value = data.get(key);
         if (value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber()) {
             try {
                 result = value.getAsBigDecimal().intValueExact();
@@ -325,7 +343,7 @@ public final class GuiDemoDefinition {
         throw new IllegalArgumentException("value must be a number between 0 and 1");
     }
 
-    private static ResourceLocation resource(JsonObject data, String key, ResourceLocation fallback) {
+    static ResourceLocation resource(JsonObject data, String key, ResourceLocation fallback) {
         JsonElement value = data.get(key);
         if (value == null) {
             return fallback;

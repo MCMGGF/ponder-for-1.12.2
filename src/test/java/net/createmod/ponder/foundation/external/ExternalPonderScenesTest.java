@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import net.createmod.ponder.CommonProxy;
 import net.createmod.ponder.Ponder;
@@ -42,6 +43,8 @@ import net.createmod.ponder.foundation.registration.DefaultPonderTagRegistration
 import net.createmod.ponder.foundation.registration.PonderLocalization;
 import net.createmod.ponder.foundation.registration.PonderSceneRegistry;
 import net.createmod.ponder.foundation.registration.PonderTagRegistry;
+import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition;
+import net.createmod.ponder.foundation.ui.GuiDemoDefinition;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry;
 import net.minecraft.client.resources.FolderResourcePack;
 import net.minecraft.client.resources.SimpleReloadableResourceManager;
@@ -151,9 +154,30 @@ class ExternalPonderScenesTest {
         resources.reloadResources(Arrays.asList(basePack, overridePack));
 
         ResourceLocation id = new ResourceLocation("sample", "machines/display");
-        assertEquals(48, ExternalPonderScenes.readGuiDemo(resources, id).width());
+        assertEquals(48, ((GuiDemoDefinition) ExternalPonderScenes.readGuiDemo(resources, id)).width());
         resources.reloadResources(Collections.singletonList(basePack));
-        assertEquals(36, ExternalPonderScenes.readGuiDemo(resources, id).width());
+        assertEquals(36, ((GuiDemoDefinition) ExternalPonderScenes.readGuiDemo(resources, id)).width());
+        Files.writeString(lowJson, """
+            {"source":{"type":"block_gui","block":"minecraft:furnace"},"keyframes":[{"tick":12}]}
+            """);
+        assertEquals(12, ((BlockGuiDemoDefinition) ExternalPonderScenes.readGuiDemo(resources, id)).lastKeyframeTick());
+    }
+
+    @Test
+    void schedulesInlineBlockGuiDemoWithTheSameOverlayTiming() {
+        JsonObject show = operation("show_gui_demo");
+        show.addProperty("id", "native");
+        show.add("demo", new JsonParser().parse("""
+            {"source":{"type":"block_gui","block":"minecraft:furnace"},"keyframes":[{"tick":12}]}
+            """));
+        JsonObject hide = operation("hide_gui_demo");
+        hide.addProperty("id", "native");
+        register(write("native-gui-demo", document(scene("native_gui_demo", idle(12), show, idle(16), hide))));
+
+        PonderScene.OverlayEvent demo = programOnlyScene().getOverlayEvents().get(0);
+        assertEquals(12, demo.getTick());
+        assertEquals(16, demo.getDuration());
+        assertNull(PonderGuiSnapshotRegistry.resolve(demo, 11.5F));
     }
 
     @Test

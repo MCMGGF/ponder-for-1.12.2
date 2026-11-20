@@ -1,0 +1,52 @@
+{
+  "namespace": "ponder_demo",
+  "scenes": [
+    {
+      "component": "minecraft:furnace",
+      "componentKey": "ponder_demo:vanilla_furnace",
+      "schematic": "ponder_legacy:mmce/empty",
+      "sceneId": "vanilla_furnace",
+      "title": "Vanilla Furnace",
+      "operations": [
+        { "type": "base_plate", "xOffset": 0, "zOffset": 0, "size": 5 },
+        { "type": "show_base_plate" },
+        { "type": "set_blocks", "from": [0, 0, 0], "to": [4, 0, 4], "state": "minecraft:stonebrick" },
+        { "type": "set_block", "pos": [2, 1, 2], "state": "minecraft:furnace", "meta": 2 },
+        { "type": "idle", "ticks": 20 },
+        {
+          "type": "show_gui_demo",
+          "id": "furnace",
+          "duration": 300,
+          "demo": {
+            "source": { "type": "block_gui", "block": "minecraft:furnace", "meta": 2 },
+            "keyframes": [
+              { "tick": 0, "properties": { "0": 0, "1": 1600, "2": 0, "3": 200 }, "pointer": { "slot": 0 } },
+              { "tick": 30, "slots": { "0": { "item": "minecraft:iron_ore" } }, "pointer": { "slot": 0, "pressed": true } },
+              { "tick": 34, "pointer": { "slot": 0 } },
+              { "tick": 55, "pointer": { "slot": 1 } },
+              { "tick": 65, "slots": { "1": { "item": "minecraft:coal" } }, "pointer": { "slot": 1, "pressed": true } },
+              { "tick": 69, "pointer": { "slot": 1 } },
+              { "tick": 95, "slots": { "1": null }, "properties": { "0": 1600, "2": 1 }, "pointer": null },
+              { "tick": 120, "properties": { "0": 1550, "2": 50 } },
+              { "tick": 145, "properties": { "0": 1500, "2": 100 } },
+              { "tick": 170, "properties": { "0": 1450, "2": 150 } },
+              { "tick": 195, "properties": { "0": 1401, "2": 199 } },
+              {
+                "tick": 210,
+                "slots": { "0": null, "2": { "item": "minecraft:iron_ingot" } },
+                "properties": { "0": 1400, "2": 0 },
+                "pointer": { "slot": 2 }
+              },
+              { "tick": 260, "slots": { "2": null }, "pointer": { "slot": 2, "pressed": true } },
+              { "tick": 264, "pointer": { "slot": 2 } }
+            ]
+          }
+        },
+        { "type": "idle", "ticks": 290 },
+        { "type": "hide_gui_demo", "id": "furnace" },
+        { "type": "idle", "ticks": 20 },
+        { "type": "mark_finished" }
+      ]
+    }
+  ]
+}

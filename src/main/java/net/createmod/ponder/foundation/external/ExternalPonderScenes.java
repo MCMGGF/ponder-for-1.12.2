@@ -40,8 +40,7 @@ import net.createmod.ponder.api.scene.SceneBuildingUtil;
 import net.createmod.ponder.api.scene.Selection;
 import net.createmod.ponder.foundation.PonderScene;
 import net.createmod.ponder.foundation.registration.PonderComponentMatcher;
-import net.createmod.ponder.foundation.ui.GuiDemoDefinition;
-import net.createmod.ponder.foundation.ui.GuiDemoSnapshot;
+import net.createmod.ponder.foundation.ui.GuiDemoTimeline;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
@@ -460,7 +459,7 @@ public final class ExternalPonderScenes {
 
     private static void enqueueGuiDemo(SceneBuilder scene, SceneBuildingUtil util, SceneOperation operation,
         GuiDemos guiDemos) {
-        GuiDemoDefinition definition = operation.guiDemo;
+        GuiDemoTimeline definition = operation.guiDemo;
         if (operation.guiDemoResource != null) {
             definition = guiDemos.resolve(operation.guiDemoResource);
         }
@@ -478,7 +477,7 @@ public final class ExternalPonderScenes {
             .placeNearTarget(operation.placeNearTarget)
             .offset(operation.offsetX, Math.round(operation.offsetY))
             .guiSnapshot(operation.guiDemoResource == null ? INLINE_GUI_DEMO : operation.guiDemoResource);
-        event.setGuiSnapshotProvider(GuiDemoSnapshot.provider(definition, event.getTick()));
+        event.setGuiSnapshotProvider(definition.provider(event.getTick()));
         applyOverlayAnchor(event, util, operation);
         if (operation.independentY != Integer.MIN_VALUE) {
             event.independent(operation.independentY);
@@ -491,7 +490,7 @@ public final class ExternalPonderScenes {
         }
     }
 
-    static GuiDemoDefinition readGuiDemo(IResourceManager resources, ResourceLocation id) throws IOException {
+    static GuiDemoTimeline readGuiDemo(IResourceManager resources, ResourceLocation id) throws IOException {
         ResourceLocation json = new ResourceLocation(id.getNamespace(), "ponder/gui_demos/" + id.getPath() + ".json");
         try (IResource resource = resources.getResource(json)) {
             byte[] data = ByteStreams.toByteArray(ByteStreams.limit(resource.getInputStream(), MAX_GUI_DEMO_BYTES + 1L));
@@ -502,7 +501,7 @@ public final class ExternalPonderScenes {
             if (!root.isJsonObject()) {
                 throw new IllegalArgumentException("GUI demo JSON must be an object");
             }
-            return GuiDemoDefinition.parse(root.getAsJsonObject());
+            return GuiDemoTimeline.parse(root.getAsJsonObject());
         }
     }
 
@@ -966,7 +965,7 @@ public final class ExternalPonderScenes {
     private static void parseGuiDemo(SceneOperation operation, JsonObject object, String defaultNamespace) {
         JsonElement demo = object.get("demo");
         if (demo != null && demo.isJsonObject()) {
-            operation.guiDemo = GuiDemoDefinition.parse(demo.getAsJsonObject());
+            operation.guiDemo = GuiDemoTimeline.parse(demo.getAsJsonObject());
         } else if (demo != null && demo.isJsonPrimitive() && demo.getAsJsonPrimitive().isString()) {
             ResourceLocation id = parseLocation(demo.getAsString(), defaultNamespace);
             if (!id.getNamespace().matches("[a-z0-9_.-]+") || ".".equals(id.getNamespace())
@@ -1762,11 +1761,11 @@ public final class ExternalPonderScenes {
 
     private static final class GuiDemos {
         private final Map<String, PonderScene.OverlayEvent> overlays = new LinkedHashMap<>();
-        private final Map<ResourceLocation, GuiDemoDefinition> definitions = new LinkedHashMap<>();
+        private final Map<ResourceLocation, GuiDemoTimeline> definitions = new LinkedHashMap<>();
 
-        private GuiDemoDefinition resolve(ResourceLocation id) {
+        private GuiDemoTimeline resolve(ResourceLocation id) {
             if (!definitions.containsKey(id)) {
-                GuiDemoDefinition definition = null;
+                GuiDemoTimeline definition = null;
                 Minecraft minecraft = Minecraft.getMinecraft();
                 if (minecraft != null && minecraft.getResourceManager() != null) {
                     try {
@@ -1863,7 +1862,7 @@ public final class ExternalPonderScenes {
         private boolean placeNearTarget;
         private String pointMode;
         private String snapshot;
-        private GuiDemoDefinition guiDemo;
+        private GuiDemoTimeline guiDemo;
         private ResourceLocation guiDemoResource;
         private String texture;
         private int textureU;

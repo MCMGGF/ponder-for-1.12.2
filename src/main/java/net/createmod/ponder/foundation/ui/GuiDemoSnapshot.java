@@ -189,7 +189,7 @@ public final class GuiDemoSnapshot implements ResettableSnapshotProvider, Snapsh
         }
     }
 
-    private static void drawPointer(Pointer pointer, float opacity) {
+    static void drawPointer(Pointer pointer, float opacity) {
         float x = pointer.x(), y = pointer.y();
         if (pointer.pressed()) {
             int left = Math.round(x) - 5;

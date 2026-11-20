@@ -9,6 +9,8 @@ Supported GUI-related operations:
 - `gui_outline_text`
 - `gui_interaction`
 - `interactionDefinitions`
+- `show_gui_demo`
+- `hide_gui_demo`
 
 ## `gui_texture`
 
@@ -68,6 +70,30 @@ Optional fields:
 - `nbt`: tile entity NBT merged into the sandbox tile before opening the GUI
 - `id`: overlay id for `gui_outline_text`
 - `pointAt`, `placeNearTarget`, `independentY`, `offsetX`, `offsetY`
+
+## `show_gui_demo` / `hide_gui_demo`
+
+Use `show_gui_demo` with an overlay `id`, `duration` in ticks, and a `demo` definition. The definition can be inline or referenced by resource ID from `assets/<namespace>/ponder/gui_demos/<path>.json`. Use `hide_gui_demo` with the same overlay `id` to close it early.
+
+Set `source.type` to `block_gui` to render a block's real container screen. `source.block` is the block registry ID. Optional `source.meta` defaults to zero, and optional `source.tileNbt` supplies the initial tile entity SNBT.
+
+The keyframe `tick` is relative to the start of the overlay. `slots` maps container slot indices to item stacks with an `item` registry ID, optional `count`, `meta` and item `nbt`. Use `null` to clear a slot. `properties` maps container property IDs to integer values. Both sets of IDs are defined by the machine's container. A keyframe retains fields it omits. `pointer` can target a `slot` or use GUI-local `x` and `y`, with optional `pressed`. Use `pointer: null` to hide it.
+
+The scene timeline controls when each change appears. Pause holds the displayed state and moving backward restores the state for the selected tick. The pointer illustrates scripted actions. The example below loads iron ore into the input slot of a vanilla furnace. See [the full example](../../../../examples/gui_demo/config/ponder/ponder_demo/vanilla_furnace.json) for fuel, progress and output.
+
+```json
+{
+  "type": "show_gui_demo",
+  "id": "furnace",
+  "duration": 80,
+  "demo": {
+    "source": { "type": "block_gui", "block": "minecraft:furnace" },
+    "keyframes": [
+      { "tick": 20, "slots": { "0": { "item": "minecraft:iron_ore" } }, "pointer": { "slot": 0 } }
+    ]
+  }
+}
+```
 
 ## `gui_outline_text`
 
