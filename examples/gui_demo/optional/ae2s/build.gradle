@@ -15,7 +15,7 @@ def ae2sVersion = '1.1.2'
 def ae2sJar = providers.gradleProperty('ae2sJar')
 def ponderDevJar = providers.gradleProperty('ponderDevJar')
     .map { file(it) }
-    .orElse(file('../../../../build/dev-libs/ponder_legacy-0.3.7-beta-dev.jar'))
+    .orElse(file('../../../../build/libs/ponder_legacy-0.3.7-beta-dev.jar'))
 
 repositories {
     mavenCentral()

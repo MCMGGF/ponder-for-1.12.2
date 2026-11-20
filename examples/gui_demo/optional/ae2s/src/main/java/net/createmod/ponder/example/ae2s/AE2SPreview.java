@@ -1,7 +1,6 @@
 package net.createmod.ponder.example.ae2s;
 
 import ae2.api.config.Settings;
-import ae2.api.config.YesNo;
 import ae2.api.orientation.RelativeSide;
 import ae2.client.gui.implementations.GuiInscriber;
 import ae2.client.gui.implementations.GuiOutputSides;
@@ -42,7 +41,7 @@ public final class AE2SPreview {
             return null;
         }
         // The live screen receives this setting from its server-side container.
-        gui.getContainer().autoExport = (YesNo) host.getConfigManager().getSetting(Settings.AUTO_EXPORT);
+        gui.getContainer().autoExport = host.getConfigManager().getSetting(Settings.AUTO_EXPORT);
         return gui;
     }
 
