@@ -77,6 +77,8 @@
 
 将 `source.type` 设为 `block_gui` 可渲染方块的真实容器界面。`source.block` 为方块注册 ID。`source.meta` 可省略，默认为 0。`source.tileNbt` 可选，用 SNBT 提供方块实体初始数据。
 
+使用 Forge 注册的 GUI 时，在 `source.guiId` 填写客户端 GUI 的数字 ID。`source.mod` 默认使用方块 ID 的命名空间。GUI 处理器需要使用传入的隔离世界和玩家返回 `GuiContainer`。演示的槽位和属性更新只作用于隔离容器，指针按压由时间轴绘制。
+
 关键帧的 `tick` 相对于叠层开始时间。`slots` 以容器槽位编号为键，值是包含 `item` 注册 ID 的物品栈，也可指定 `count`、`meta` 和物品 `nbt`。用 `null` 清空槽位。`properties` 以容器属性编号为键，值为整数。槽位和属性编号由各机器容器定义。关键帧省略的字段沿用已有状态。`pointer` 可通过 `slot` 指向槽位，或使用 GUI 内的 `x`、`y` 坐标定位，也可指定 `pressed`。用 `pointer: null` 隐藏指针。
 
 场景时间轴决定每次变化何时显示。暂停时保持当前状态，回退时恢复到所选 tick 的状态。指针演示脚本安排的操作。下面的例子向原版熔炉输入槽放入铁矿石，燃料、进度和出料见[完整示例](../../../../examples/gui_demo/config/ponder/ponder_demo/vanilla_furnace.json)。

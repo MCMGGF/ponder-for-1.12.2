@@ -95,6 +95,8 @@ The scene timeline controls when each change appears. Pause holds the displayed 
 }
 ```
 
+For a GUI registered with Forge, set `source.guiId` to the numeric client GUI ID. `source.mod` defaults to the block ID's namespace. The GUI handler must return a `GuiContainer` using the supplied detached world and player. Slot and property updates apply to that container. The timeline draws pointer presses.
+
 ## `gui_outline_text`
 
 Highlights a rectangle inside a parent GUI overlay and attaches text.

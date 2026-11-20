@@ -30,8 +30,8 @@ class BlockGuiDemoDefinitionTest {
         assertEquals("minecraft:furnace", demo.block().toString());
         assertEquals(3, demo.meta());
         assertEquals(20, demo.lastKeyframeTick());
-        assertEquals(Set.of(0, 2), demo.slotIds());
-        assertEquals(Set.of(1, 2), demo.propertyIds());
+        assertEquals(Set.of(0, 2), demo.stateAt(20).slots().keySet());
+        assertEquals(Set.of(1, 2), demo.stateAt(20).properties().keySet());
         assertTrue(demo.stateAt(20).slots().containsKey(0));
         assertNull(demo.stateAt(20).slots().get(0));
         assertEquals("minecraft:iron_ingot", demo.stateAt(50).slots().get(2).item().toString());

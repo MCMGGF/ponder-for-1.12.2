@@ -134,14 +134,6 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
         return guiModId;
     }
 
-    Set<Integer> slotIds() {
-        return Collections.unmodifiableSet(slots.keySet());
-    }
-
-    Set<Integer> propertyIds() {
-        return Collections.unmodifiableSet(properties.keySet());
-    }
-
     State stateAt(float tick) {
         int wholeTick = (int) Math.floor(tick);
         return new State(valuesAt(slots, wholeTick), valuesAt(properties, wholeTick));
