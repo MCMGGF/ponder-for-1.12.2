@@ -13,7 +13,29 @@
 
 熔炉示例从玩家背包取出铁矿石和煤，通过原版槽位放入熔炉，等待实际产出铁锭，然后取回背包。铭刻器示例通过左侧按钮开启自动输出，进入输出侧面，清空原选择并启用顶面。脚本返回主界面，关闭并重新打开铭刻器，核对服务端的侧面掩码和模板槽位，再放入硅。相邻的创造能源元件为加工供电，脚本等待产出压印硅并取回背包。此场景只需复制 JSON。
 
-## 原版熔炉
+### 为其他机器编写录制脚本
+
+复制熔炉场景，修改场景 ID、展示的方块以及 `show_gui_demo.demo`。录制定义包含 `source` 和 `sandbox` 两个对象。
+
+| 字段 | 填写方式 |
+| --- | --- |
+| `source` | `type` 填 `block_gui`，`block` 填机器的注册 ID。`meta` 默认 0，范围 0–15。可用 `tileNbt` 提供初始化方块实体的 SNBT 字符串。 |
+| `source.capture` | 可选。用 `left`、`top`、`right`、`bottom` 分别扩展容器截图的四边，每边 0–512 个 GUI 逻辑像素，默认 0。裁剪范围须能完整放入实际游戏窗口。 |
+| `sandbox.inventory` | 可选。对象的键是玩家物品栏编号，0–8 为快捷栏，9–35 为背包；开局选中 0。物品写成 `{"item":"minecraft:coal","count":1,"meta":0}`。`count` 默认 1，范围 1–127；`meta` 默认 0，范围 0–32767；可选 `nbt` 为 SNBT 字符串。 |
+| `sandbox.neighbors` | 可选。最多放六个与机器面相邻的方块。每项填写 `block` 和相对位移 `x`、`y`、`z`，省略的轴为 0，恰有一轴取 1 或 −1。每面只放一次，可附 `meta`、`tileNbt`，例如在机器东侧放能源方块。 |
+| `sandbox.actions` | 按 `tick` 升序排列 1–2048 个动作。录制从 0 开始，最迟到 23999 tick。`tick` 是最早执行时间，同 tick 按数组顺序逐个执行。等待期间机器继续运转，后续动作等条件满足才开始。外层 `show_gui_demo.duration` 要给加工和结果展示留出时间。 |
+
+| 动作 `type` | 参数和效果 |
+| --- | --- |
+| `activate`、`close` | `activate` 用主手右键点击机器北面并等待界面打开。`close` 关闭当前界面。要验证设置持久化，可在两者之间修改设置，再重新打开检查。 |
+| `click` | 用 `slot` 点当前容器槽位的中心，或同时指定 `x`、`y` 点控件。`button` 为 0 左键、1 右键、2 中键，默认 0。容器坐标从主面板左上角起算，普通屏幕从屏幕左上角起算。最小值分别为 `-capture.left`、`-capture.top`，最大值均为 4095，落点还须在屏幕内。 |
+| `wait_screen` | `screen` 填实际 GUI 类的简单名或完整类名，区分大小写，例如 `GuiFurnace`。适合在按钮点击后等待子界面打开。 |
+| `wait_slot` | `slot` 是当前容器编号（0–4095，且容器中须有该槽位）。`stack` 填物品对象，留空槽用 JSON 的 `null`。客户端和服务端必须在同一窗口观察到匹配的物品、数量、元数据和 NBT。例：熔炉界面的槽 3 对应玩家背包编号 9。 |
+| `wait_nbt` | `nbt` 填非空 SNBT 复合标签，核对服务端目标机器的方块实体。只列所需字段，保持标签类型，例如铭刻器示例的 `"{outputSides:2}"` 匹配整数值。 |
+
+三个 `wait_*` 动作均可指定 `timeout`，默认 100 tick，范围 1–2400。实际界面使用当前启用的资源包顺序、语言和 GUI 缩放；文件形式的服务器资源包也会加入录制。换机器时，先用 `activate` 和 `wait_screen` 验证入口，再加入一组点击及对应的槽位或 NBT 检查。录制失败可查看实例内 `ponder-gui-cache/last-error-<场景定义哈希>.log` 和 `logs/latest.log`，依失败动作编号核对容器槽位、物品、供能及等待时间。
+
+## 手动关键帧示例：原版熔炉
 
 1. 将 `config/ponder/ponder_demo/vanilla_furnace.json` 复制到游戏实例的同名路径。原版熔炉示例只需这个配置文件。
 2. 进入单人世界执行 `/ponder reload`，再执行 `/ponderui ponder_demo:vanilla_furnace 0`。也可用 `/ponder compile ponder_demo:vanilla_furnace` 检查场景索引。
@@ -33,7 +55,7 @@
 
 该场景的 `show_gui_demo` 内联定义通过 `source.type: "block_gui"` 打开原版熔炉界面。在关键帧中，`slots` 使用原版熔炉容器槽位编号 0（输入）、1（燃料）和 2（输出）。`properties` 使用容器属性编号 0（剩余燃烧时间）、1（总燃烧时间）、2（已烧炼时间）和 3（所需烧炼时间）。场景 JSON 直接安排状态变化，所以每次重播都按相同时间展示。
 
-## AE2S 铭刻器与输出侧面（可选）
+## 手动关键帧示例：AE2S 铭刻器与输出侧面（可选适配器）
 
 1. 在安装了 Applied Energistics 2 Supergiant 1.1.2 和 Ponder Legacy 的客户端中，将可选的 Ponder AE2S Preview 适配器 JAR 放进 `mods`。从源码构建适配器时，在仓库根目录执行下面的 PowerShell 命令，替换 Ponder 开发版 JAR 路径。从本地指定 AE2S JAR 时，在命令末尾追加 `"-Pae2sJar=<AE2S 1.1.2 JAR 路径>"`。
 

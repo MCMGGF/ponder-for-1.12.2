@@ -160,12 +160,40 @@ record SandboxProfile(Path game, Path assets, List<Pack> packs, String version, 
         return name.contains("load") && (name.endsWith("_timings.dat") || name.endsWith("_timings.nbt"));
     }
 
-    private static boolean skipFile(Path root, Path file) {
+    private static boolean skipFile(Path root, Path file) throws IOException {
+        Path relative = root.relativize(file);
+        if (root.endsWith("fancymenu_data") && relative.equals(Path.of("last_world.fmdata"))) return true;
+        if (root.endsWith("config") && relative.equals(Path.of("jei", "worldSettings.cfg")))
+            return containsOnlyWorldPreferences(file);
         if (root.getFileName().toString().equals("mods")) {
             String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
             return !name.endsWith(".jar") && !name.endsWith(".zip");
         }
         return false;
+    }
+
+    private static final Pattern WORLD_GROUP = Pattern.compile("world-?[0-9]+\\s*\\{");
+    private static final Pattern FORGE_SETTING = Pattern.compile("[BIDS]:[^=]+=[^\\r\\n]*");
+
+    private static boolean containsOnlyWorldPreferences(Path file) throws IOException {
+        boolean inWorld = false;
+        try (var reader = Files.newBufferedReader(file, StandardCharsets.ISO_8859_1)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String value = line.strip();
+                if (value.isEmpty() || value.startsWith("#")) continue;
+                if (!inWorld) {
+                    if (value.startsWith("~CONFIG_VERSION:")) continue;
+                    if (!WORLD_GROUP.matcher(value).matches()) return false;
+                    inWorld = true;
+                } else if (value.equals("}")) {
+                    inWorld = false;
+                } else if (!FORGE_SETTING.matcher(value).matches()) {
+                    return false;
+                }
+            }
+        }
+        return !inWorld;
     }
 
     private static void copyTree(Path src, Path dst) throws IOException {

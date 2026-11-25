@@ -12,6 +12,32 @@ class SandboxProfileFingerprintTest {
     @TempDir Path root;
 
     @Test
+    void excludesHostWorldHistoryFromFingerprintAndWorkerCopyWhileKeepingGlobalSettings() throws Exception {
+        Path game = Files.createDirectory(root.resolve("game"));
+        SandboxProfile profile = new SandboxProfile(game, root, List.of(), "1.12.2", "en_us", 1, false, 800, 600, "");
+        String original = profile.fingerprint();
+        String firstWorld = "# Configuration file\n~CONFIG_VERSION: 0.1.0\nworld-42 {\n S:filterText=@app\n}\n";
+        Path settings = write(game, "config/jei/worldSettings.cfg", firstWorld.getBytes(StandardCharsets.UTF_8));
+        Path menu = write(game, "fancymenu_data/last_world.fmdata", "world = First".getBytes(StandardCharsets.UTF_8));
+        assertEquals(original, profile.fingerprint());
+        Files.writeString(settings, firstWorld + "world123 {\n B:overlayEnabled=true\n}\n");
+        Files.writeString(menu, "world = Second");
+        assertEquals(original, profile.fingerprint());
+        var copyTree = SandboxProfile.class.getDeclaredMethod("copyTree", Path.class, Path.class);
+        copyTree.setAccessible(true);
+        Path isolated = root.resolve("isolated");
+        for (String folder : List.of("config", "fancymenu_data"))
+            copyTree.invoke(null, game.resolve(folder), isolated.resolve(folder));
+        assertFalse(Files.exists(isolated.resolve(game.relativize(settings))));
+        assertFalse(Files.exists(isolated.resolve(game.relativize(menu))));
+        String mixed = firstWorld + "general {\n B:showIcons=true\n}\n";
+        Files.writeString(settings, mixed);
+        assertNotEquals(original, profile.fingerprint());
+        copyTree.invoke(null, game.resolve("config"), isolated.resolve("config"));
+        assertEquals(mixed, Files.readString(isolated.resolve(game.relativize(settings))));
+    }
+
+    @Test
     void generatedCommentsAndBinaryCachesDoNotInvalidateRecordings() throws Exception {
         Path game = Files.createDirectory(root.resolve("game"));
         SandboxProfile profile = new SandboxProfile(game, root, List.of(), "1.12.2", "en_us", 1, false, 800, 600, "");
