@@ -1,5 +1,18 @@
 # 脚本化 GUI 演示
 
+## 录制真实操作
+
+| 所需模组 | 复制到实例 `config/ponder/ponder_demo/` 的场景 | 打开场景 |
+| --- | --- | --- |
+| Ponder Legacy | [sandbox_furnace.json](config/ponder/ponder_demo/sandbox_furnace.json) | `/ponderui ponder_demo:sandbox_furnace 0` |
+| Ponder Legacy、AE2S 1.1.2 及其依赖 | [sandbox_ae2s_inscriber.json](optional/ae2s/config/ponder/ponder_demo/sandbox_ae2s_inscriber.json) | `/ponderui ponder_demo:sandbox_ae2s_inscriber 0` |
+
+可以运行 `gradlew sandboxExampleZips`，将 `build/sandbox-examples` 中所需的 ZIP 解压到实例目录。启动后客户端会安排录制。游戏运行中改动本地场景时执行 `/ponder reload`。改动资源包时按 F3+T。录制完成后，在世界内执行表中的命令。Ponder 时间轴可暂停、回退和重播已录制的画面。
+
+首次录制会在后台启动游戏客户端，加载整合包的模组并执行配方。录制进程的堆上限默认取主客户端的堆上限，最高 4096 MiB。可通过启动参数 `-Dponder.sandbox.maxHeapMiB=6144` 调整。相同场景和环境会复用实例 `ponder-gui-cache/recordings` 中的录制。启动时，若其他客户端正在使用该缓存，本次会跳过清理。空闲时优先清除较早的旧版本，录制缓存的清理目标为 512 MiB。当前场景所需的录制可以超过该值。
+
+熔炉示例从玩家背包取出铁矿石和煤，通过原版槽位放入熔炉，等待实际产出铁锭，然后取回背包。铭刻器示例通过左侧按钮开启自动输出，进入输出侧面，清空原选择并启用顶面。脚本返回主界面，关闭并重新打开铭刻器，核对服务端的侧面掩码和模板槽位，再放入硅。相邻的创造能源元件为加工供电，脚本等待产出压印硅并取回背包。此场景只需复制 JSON。
+
 ## 原版熔炉
 
 1. 将 `config/ponder/ponder_demo/vanilla_furnace.json` 复制到游戏实例的同名路径。原版熔炉示例只需这个配置文件。

@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonParser;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Set;
 import java.util.function.Function;
 import net.createmod.ponder.foundation.ui.GuiDemoDefinition.Pointer;
@@ -284,6 +286,61 @@ class BlockGuiDemoDefinitionTest {
                 {"source":{"type":"block_gui","block":"sample:machine","factory":"sample:main",%s}}
                 """.formatted(fields)), fields);
         }
+    }
+
+    @Test
+    void loadsStandaloneRecordingsWithPhysicalInputAndStateChecks() throws Exception {
+        for (String path : Set.of("config/ponder/ponder_demo/sandbox_furnace.json",
+            "optional/ae2s/config/ponder/ponder_demo/sandbox_ae2s_inscriber.json")) {
+            var file = Path.of("examples/gui_demo").resolve(path);
+            var scene = new JsonParser().parse(Files.readString(file)).getAsJsonObject()
+                .getAsJsonArray("scenes").get(0).getAsJsonObject();
+            var operations = scene.getAsJsonArray("operations");
+            boolean foundDemo = false;
+            for (var operation : operations) {
+                var entry = operation.getAsJsonObject();
+                if (!entry.get("type").getAsString().equals("show_gui_demo")) continue;
+                var raw = entry.getAsJsonObject("demo");
+                var demo = BlockGuiDemoDefinition.parse(raw);
+                var script = demo.sandbox();
+                assertEquals(Set.of(9, 10), script.inventory().keySet());
+                assertEquals("activate", script.actions().getFirst().type());
+                assertTrue(script.actions().stream().anyMatch(action -> action.type().equals("wait_slot")));
+                assertTrue(demo.lastKeyframeTick() < entry.get("duration").getAsInt());
+                assertEquals(path.contains("ae2s") ? 1 : 0, script.neighbors().size());
+                demo.rawJson().remove("sandbox");
+                assertEquals(raw, demo.rawJson());
+                foundDemo = true;
+                break;
+            }
+            assertTrue(foundDemo, path);
+        }
+    }
+
+    @Test
+    void sandboxRejectsMalformedConditionsAndMutationShortcuts() {
+        String source = "{\"type\":\"block_gui\",\"block\":\"minecraft:furnace\"}";
+        for (String action : Set.of(
+            "{\"tick\":0,\"type\":\"click\",\"slot\":1,\"x\":2}",
+            "{\"tick\":0,\"type\":\"click\",\"y\":2}",
+            "{\"tick\":0,\"type\":\"wait_nbt\",\"nbt\":\"{}\"}",
+            "{\"tick\":0,\"type\":\"wait_screen\",\"screen\":\"*\"}",
+            "{\"tick\":0,\"type\":\"wait_slot\",\"slot\":0}",
+            "{\"tick\":0,\"type\":\"wait_slot\",\"slot\":0,\"stack\":null,\"timeout\":0}",
+            "{\"tick\":1,\"type\":\"activate\"},{\"tick\":0,\"type\":\"close\"}",
+            "{\"tick\":0,\"type\":\"activate\",\"slots\":{}}")) {
+            assertThrows(IllegalArgumentException.class, () -> parse(
+                "{\"source\":" + source + ",\"sandbox\":{\"actions\":[" + action + "]}}"), action);
+        }
+        String actions = "\"actions\":[{\"tick\":0,\"type\":\"activate\"}]";
+        for (String extra : Set.of("\"inventory\":{\"36\":{\"item\":\"minecraft:coal\"}}",
+            "\"neighbors\":[{\"block\":\"minecraft:stone\"}]",
+            "\"neighbors\":[{\"x\":1,\"block\":\"minecraft:stone\"},{\"x\":1,\"block\":\"minecraft:dirt\"}]")) {
+            assertThrows(IllegalArgumentException.class, () -> parse(
+                "{\"source\":" + source + ",\"sandbox\":{" + actions + "," + extra + "}}"), extra);
+        }
+        assertThrows(IllegalArgumentException.class, () -> parse(
+            "{\"source\":" + source + ",\"sandbox\":{" + actions + "},\"keyframes\":[]}"));
     }
 
     private static BlockGuiDemoDefinition parse(String json) {

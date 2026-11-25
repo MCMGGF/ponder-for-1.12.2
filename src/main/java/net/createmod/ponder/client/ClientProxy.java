@@ -85,6 +85,7 @@ public class ClientProxy extends CommonProxy {
 
     @Override
     public void init() {
+        net.createmod.ponder.foundation.ui.sandbox.SandboxRecordings.initialize();
         JeiScreenCompat.tryInstall();
         registerClientCommand(new PonderCommand());
         registerClientCommand(new PonderClientCommand());
@@ -143,6 +144,7 @@ public class ClientProxy extends CommonProxy {
 
     @Override
     public void onPonderReload() {
+        net.createmod.ponder.foundation.ui.sandbox.SandboxRecordings.requestRefresh();
         MmceStaticModelPreviews.getInstance().clear();
         projectorRenderer.clear();
     }

@@ -34,7 +34,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Test and build the Cleanroom client, Forge shim and oil-line addon
-        run: ./gradlew.bat test remapJar sourcesJar forgeServerShimJar oilLineTest remapOilLineJar --continue --stacktrace
+        run: ./gradlew.bat test remapJar sourcesJar forgeServerShimJar oilLineTest remapOilLineJar sandboxExampleZips --continue --stacktrace
 
       - name: Build the migrated Java addon
         run: ./gradlew.bat -p examples/addon assemble --stacktrace
@@ -108,6 +108,13 @@ jobs:
         with:
           name: cleanroom-optional-oil-line
           path: build/optional-libs/*.jar
+          if-no-files-found: error
+
+      - name: Upload the independent sandbox GUI examples
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-gui-examples
+          path: build/sandbox-examples/*.zip
           if-no-files-found: error
 
       - name: Upload build and repository diagnostics

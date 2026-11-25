@@ -73,6 +73,32 @@ public final class ExternalPonderScenes {
     private ExternalPonderScenes() {
     }
 
+    // Keep the references from the last committed scene index. Resolve resource IDs again on F3+T.
+    private static volatile List<SceneOperation> guiDemoOperations = List.of();
+
+    static void rememberGuiDemos(ExternalDefinitionSet definitions) {
+        List<SceneOperation> demos = new ArrayList<>();
+        for (SceneDefinition scene : definitions.scenes) collectGuiDemos(scene.operations, demos);
+        guiDemoOperations = List.copyOf(demos);
+    }
+
+    private static void collectGuiDemos(List<SceneOperation> operations, List<SceneOperation> demos) {
+        for (SceneOperation op : operations) {
+            if (op.guiDemo != null || op.guiDemoResource != null) demos.add(op);
+            collectGuiDemos(op.childOperations, demos);
+        }
+    }
+
+    public static void visitGuiDemos(IResourceManager resources, Consumer<GuiDemoTimeline> consumer) {
+        for (SceneOperation op : guiDemoOperations) {
+            try {
+                consumer.accept(op.guiDemoResource == null ? op.guiDemo : readGuiDemo(resources, op.guiDemoResource));
+            } catch (IOException | RuntimeException invalid) {
+                Ponder.LOGGER.warn("Cannot prepare GUI demonstration {}", op.guiDemoResource, invalid);
+            }
+        }
+    }
+
     public static synchronized void rememberScriptJson(String path) {
         File resolved = resolveQueuedPath(path);
         if (resolved == null) {

@@ -39,6 +39,9 @@ public class ExternalPonderPlugin implements PonderPlugin {
 
     @Override
     public void onPonderReloadEnd(boolean successful) {
+        if (successful && reloadDefinitions != null) {
+            ExternalPonderScenes.rememberGuiDemos(reloadDefinitions);
+        }
         reloadDefinitions = null;
         reloading = false;
     }

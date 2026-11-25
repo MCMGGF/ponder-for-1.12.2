@@ -103,6 +103,27 @@ For a native block GUI demo, use `screens` to name additional views of the same 
 
 Each view retains its own scripted slots, properties, and pointer state. Pointer movement is interpolated within each visit to a view. The optional AE2S example uses a separate preview adapter for the Inscriber's Output Sides screen. [AE2S Inscriber example](../../../../examples/gui_demo/optional/ae2s/config/ponder/ponder_demo/ae2s_inscriber_subgui.json)
 
+### Record real block interactions
+
+A `block_gui` definition containing a top-level `sandbox` records actions against the block inside an isolated client and integrated server. Set `source.block` and optionally `source.meta`, `source.tileNbt`, and `source.capture`. Capture margins include controls extending beyond the container background. The Ponder timeline plays the resulting frames.
+
+| Sandbox field | Format |
+| --- | --- |
+| `inventory` | Optional mapping of player inventory indices to stacks. Slots 0–8 hold the hotbar and 9–35 the main inventory. A stack takes an `item` ID, optional `count`, `meta`, and an SNBT compound string in `nbt`. |
+| `neighbors` | Optional array of up to six blocks adjacent to the machine. Each takes `block`, optional `meta` and `tileNbt`, and relative offsets `x`, `y`, `z` defaulting to zero. Use one distinct face per entry. |
+| `actions` | Array of 1–2048 actions in execution order. Each has a `type` and a nondecreasing `tick` from 0 through 23999. The tick is the earliest execution time relative to the overlay start. |
+
+| Action | Effect |
+| --- | --- |
+| `activate` | Right-click the block with the player's main hand. |
+| `click` | Click a container `slot` or GUI-local `x` and `y` coordinates. Optional `button` is 0 for left (default), 1 for right, or 2 for middle. |
+| `wait_screen` | Wait for `screen` to match the simple or fully qualified GUI class name. |
+| `wait_slot` | Wait for container `slot` to contain the specified `stack`, or `null` for an empty slot. |
+| `wait_nbt` | Match the nonempty SNBT compound in `nbt` against the server's serialized machine data. |
+| `close` | Close the current screen. A later `activate` reopens the same machine. |
+
+Wait actions accept a `timeout` of 1–2400 ticks, default 100. Allow enough time for actual machine processing. The standalone examples check both the machine output and the player's inventory after collection. [Vanilla furnace](../../../../examples/gui_demo/config/ponder/ponder_demo/sandbox_furnace.json) · [AE2S 1.1.2 Inscriber](../../../../examples/gui_demo/optional/ae2s/config/ponder/ponder_demo/sandbox_ae2s_inscriber.json)
+
 ## `gui_outline_text`
 
 Highlights a rectangle inside a parent GUI overlay and attaches text.

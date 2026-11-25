@@ -8,7 +8,8 @@ import zone.rong.mixinbooter.IEarlyMixinLoader;
 public final class NativeGuiCorePlugin implements IFMLLoadingPlugin, IEarlyMixinLoader {
     @Override
     public List<String> getMixinConfigs() {
-        return List.of("mixins.ponder.json");
+        return System.getProperty("ponder.sandbox.job") == null ? List.of("mixins.ponder.json")
+            : List.of("mixins.ponder.json", "mixins.ponder.worker.json");
     }
 
     @Override

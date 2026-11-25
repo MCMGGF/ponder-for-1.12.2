@@ -12,12 +12,12 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
 /** Static texture validation only. No AWT image objects, profiles, plugins or GPU calls are involved. */
-final class PngAssetValidator {
+public final class PngAssetValidator {
     static final int MAX_FILE_BYTES = 64 * 1024 * 1024;
     private static final Set<String> ALLOWED = new HashSet<>(Arrays.asList("IHDR", "PLTE", "IDAT", "IEND", "tRNS", "gAMA", "cHRM", "sRGB", "pHYs", "sBIT", "bKGD", "hIST", "tIME", "tEXt"));
     private PngAssetValidator() { }
 
-    static long validate(byte[] bytes, long remainingDecodedBytes) throws IOException {
+    public static long validate(byte[] bytes, long remainingDecodedBytes) throws IOException {
         byte[] signature = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
         if (bytes == null || bytes.length < 45 || bytes.length > MAX_FILE_BYTES) throw new IOException("PNG file is truncated or exceeds 64 MiB");
         for (int i = 0; i < 8; i++) if (bytes[i] != signature[i]) throw new IOException("Not a PNG image");

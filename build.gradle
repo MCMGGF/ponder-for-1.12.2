@@ -427,6 +427,23 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.register('sandboxExampleZips') {
+    group = 'distribution'
+    description = 'Packages each sandbox GUI scene for installation in a game instance.'
+}
+
+[
+    sandboxFurnaceZip: ['examples/gui_demo', 'sandbox_furnace', 'ponder-sandbox-furnace'],
+    sandboxInscriberZip: ['examples/gui_demo/optional/ae2s', 'sandbox_ae2s_inscriber', 'ponder-sandbox-ae2s-inscriber']
+].each { name, spec ->
+    def example = tasks.register(name, Zip) {
+        from(spec[0]) { include "config/ponder/ponder_demo/${spec[1]}.json" }
+        archiveFileName.set("${spec[2]}.zip")
+        destinationDirectory.set(layout.buildDirectory.dir('sandbox-examples'))
+    }
+    tasks.named('sandboxExampleZips') { dependsOn(example) }
+}
+
 tasks.register('deployToConfiguredTestMods', Copy) {
     group = 'deployment'
     description = 'Copies the remapped jar into the configured desktop test instance mods folder.'

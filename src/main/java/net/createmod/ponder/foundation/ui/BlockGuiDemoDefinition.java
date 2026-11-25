@@ -10,6 +10,7 @@ import static net.createmod.ponder.foundation.ui.GuiDemoDefinition.string;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +20,8 @@ import java.util.TreeMap;
 import java.util.function.Function;
 import net.createmod.ponder.foundation.ui.GuiDemoDefinition.Pointer;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.SnapshotProvider;
+import net.createmod.ponder.foundation.ui.sandbox.RecordedGuiPlayback;
+import net.createmod.ponder.foundation.ui.sandbox.SandboxRecordings;
 import net.minecraft.nbt.JsonToNBT;
 import net.minecraft.nbt.NBTException;
 import net.minecraft.nbt.NBTTagCompound;
@@ -34,11 +37,11 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     private static final int MAX_NBT_LENGTH = 8192;
     private static final int MAX_NBT_DEPTH = 64;
 
-    record Insets(int left, int top, int right, int bottom) {
+    public record Insets(int left, int top, int right, int bottom) {
         private static final Insets NONE = new Insets(0, 0, 0, 0);
     }
 
-    record Stack(ResourceLocation item, int count, int meta, NBTTagCompound nbt) {
+    public record Stack(ResourceLocation item, int count, int meta, NBTTagCompound nbt) {
         @Override
         public NBTTagCompound nbt() {
             return nbt == null ? null : nbt.copy();
@@ -88,14 +91,18 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     private final ScreenTracks main;
     private final NavigableMap<Integer, ScreenTracks> screenChanges = new TreeMap<>();
     private final int lastKeyframeTick;
+    private final SandboxGuiScript sandbox;
+    private final String rawJson;
 
-    private BlockGuiDemoDefinition(JsonObject source, JsonElement screens, NavigableMap<Integer, JsonObject> frames) {
+    private BlockGuiDemoDefinition(JsonObject root, JsonObject source, NavigableMap<Integer, JsonObject> frames) {
         block = requiredResource(source, "block");
         meta = integer(source, "meta", 0, 0, 15);
         tileNbt = nbt(source, "tileNbt");
         Screen defaults = new Screen(MAIN_SCREEN, null, block.getNamespace(), null, Insets.NONE);
         main = new ScreenTracks(readScreen(source, MAIN_SCREEN, "source", defaults));
-        Map<String, ScreenTracks> tracksByScreen = readScreens(screens, main);
+        sandbox = root.has("sandbox") ? SandboxGuiScript.parse(object(root.get("sandbox"), "sandbox"), main.screen.capture()) : null;
+        rawJson = root.toString();
+        Map<String, ScreenTracks> tracksByScreen = readScreens(root.get("screens"), main);
 
         ScreenTracks active = main;
         for (Map.Entry<Integer, JsonObject> entry : frames.entrySet()) {
@@ -116,18 +123,20 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
                 throw new IllegalArgumentException("Keyframe " + tick + ": " + invalid.getMessage(), invalid);
             }
         }
-        lastKeyframeTick = frames.isEmpty() ? 0 : frames.lastKey();
+        lastKeyframeTick = sandbox != null ? sandbox.actions().getLast().tick() : frames.isEmpty() ? 0 : frames.lastKey();
     }
 
     public static BlockGuiDemoDefinition parse(JsonObject root) {
-        fields(root, Set.of("source", "screens", "keyframes"));
+        boolean recorded = root.has("sandbox");
+        fields(root, recorded ? Set.of("source", "sandbox") : Set.of("source", "screens", "keyframes"));
         JsonObject source = object(root.get("source"), "source");
-        fields(source, Set.of("type", "block", "meta", "tileNbt", "guiId", "mod", "factory", "capture"));
+        fields(source, recorded ? Set.of("type", "block", "meta", "tileNbt", "capture")
+            : Set.of("type", "block", "meta", "tileNbt", "guiId", "mod", "factory", "capture"));
         if (!"block_gui".equals(string(source, "type", ""))) {
             throw new IllegalArgumentException("GUI demo source.type must be block_gui");
         }
 
-        return new BlockGuiDemoDefinition(source, root.get("screens"),
+        return new BlockGuiDemoDefinition(root, source,
             keyframes(root, Set.of("tick", "screen", "slots", "properties", "pointer"), MAX_DEMO_TICK));
     }
 
@@ -138,18 +147,29 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
 
     @Override
     public SnapshotProvider provider(int startTick) {
+        if (sandbox() != null) {
+            return RecordedGuiPlayback.provider(SandboxRecordings.id(rawJson()), startTick);
+        }
         return BlockGuiDemoSnapshot.provider(this, startTick);
     }
 
-    ResourceLocation block() {
+    public SandboxGuiScript sandbox() {
+        return sandbox;
+    }
+
+    public JsonObject rawJson() {
+        return new JsonParser().parse(rawJson).getAsJsonObject();
+    }
+
+    public ResourceLocation block() {
         return block;
     }
 
-    int meta() {
+    public int meta() {
         return meta;
     }
 
-    NBTTagCompound tileNbt() {
+    public NBTTagCompound tileNbt() {
         return tileNbt == null ? null : tileNbt.copy();
     }
 
@@ -161,7 +181,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
         return main.screen.guiModId();
     }
 
-    Insets capture() {
+    public Insets capture() {
         return main.screen.capture();
     }
 
@@ -287,7 +307,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
             integer(pointer, "y", -capture.top() - 1, -capture.top(), MAX_POINTER_COORDINATE), pressed);
     }
 
-    private static Stack readStack(JsonElement value) {
+    static Stack readStack(JsonElement value) {
         if (value.isJsonNull()) {
             return null;
         }
@@ -297,7 +317,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
             integer(stack, "meta", 0, 0, 32767), nbt(stack, "nbt"));
     }
 
-    private static ResourceLocation requiredResource(JsonObject data, String key) {
+    static ResourceLocation requiredResource(JsonObject data, String key) {
         ResourceLocation id = resource(data, key, null);
         if (id == null || id.getNamespace().equals(".") || id.getNamespace().equals("..")) {
             throw new IllegalArgumentException(key + " must be a resource ID with a namespace");
@@ -305,7 +325,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
         return id;
     }
 
-    private static NBTTagCompound nbt(JsonObject data, String key) {
+    static NBTTagCompound nbt(JsonObject data, String key) {
         JsonElement value = data.get(key);
         if (value == null) {
             return null;

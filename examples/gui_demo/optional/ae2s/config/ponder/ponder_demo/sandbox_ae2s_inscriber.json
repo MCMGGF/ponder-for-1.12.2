@@ -1,0 +1,75 @@
+{
+  "namespace": "ponder_demo",
+  "scenes": [
+    {
+      "component": "ae2:inscriber",
+      "componentKey": "ponder_demo:sandbox_ae2s_inscriber",
+      "schematic": "ponder_legacy:mmce/empty",
+      "sceneId": "sandbox_ae2s_inscriber",
+      "title": "Configure output sides and inscribe silicon",
+      "operations": [
+        {"type": "base_plate", "xOffset": 0, "zOffset": 0, "size": 5},
+        {"type": "show_base_plate"},
+        {"type": "set_blocks", "from": [0, 0, 0], "to": [4, 0, 4], "state": "minecraft:stonebrick"},
+        {"type": "set_block", "pos": [2, 1, 2], "state": "ae2:inscriber"},
+        {"type": "set_block", "pos": [3, 1, 2], "state": "ae2:creative_energy_cell"},
+        {"type": "idle", "ticks": 20},
+        {
+          "type": "show_gui_demo",
+          "id": "inscriber",
+          "duration": 390,
+          "demo": {
+            "source": {
+              "type": "block_gui",
+              "block": "ae2:inscriber",
+              "tileNbt": "{internalCurrentPower:1600.0d,auto_export:\"NO\",up:\"UP\",forward:\"NORTH\",outputSides:63}",
+              "capture": {"left": 24, "top": 8, "right": 24}
+            },
+            "sandbox": {
+              "neighbors": [{"x": 1, "block": "ae2:creative_energy_cell"}],
+              "inventory": {
+                "9": {"item": "ae2:silicon_press"},
+                "10": {"item": "ae2:silicon"}
+              },
+              "actions": [
+                {"tick": 0, "type": "activate"},
+                {"tick": 1, "type": "wait_screen", "screen": "GuiInscriber"},
+                {"tick": 4, "type": "wait_slot", "slot": 5, "stack": {"item": "ae2:silicon_press"}, "timeout": 100},
+                {"tick": 12, "type": "click", "slot": 5},
+                {"tick": 25, "type": "click", "slot": 41},
+                {"tick": 26, "type": "wait_slot", "slot": 41, "stack": {"item": "ae2:silicon_press"}, "timeout": 100},
+                {"tick": 40, "type": "click", "x": -7, "y": 33},
+                {"tick": 41, "type": "wait_nbt", "nbt": "{auto_export:\"YES\"}"},
+                {"tick": 58, "type": "click", "x": -7, "y": 77},
+                {"tick": 59, "type": "wait_screen", "screen": "GuiOutputSides"},
+                {"tick": 75, "type": "click", "x": 82, "y": 76},
+                {"tick": 76, "type": "wait_nbt", "nbt": "{outputSides:0}"},
+                {"tick": 95, "type": "click", "x": 46, "y": 24},
+                {"tick": 96, "type": "wait_nbt", "nbt": "{outputSides:2}"},
+                {"tick": 115, "type": "click", "x": 79, "y": 5},
+                {"tick": 116, "type": "wait_screen", "screen": "GuiInscriber"},
+                {"tick": 130, "type": "close"},
+                {"tick": 145, "type": "activate"},
+                {"tick": 146, "type": "wait_screen", "screen": "GuiInscriber"},
+                {"tick": 148, "type": "wait_nbt", "nbt": "{auto_export:\"YES\",outputSides:2}"},
+                {"tick": 150, "type": "wait_slot", "slot": 41, "stack": {"item": "ae2:silicon_press"}, "timeout": 100},
+                {"tick": 165, "type": "click", "slot": 6},
+                {"tick": 180, "type": "click", "slot": 43},
+                {"tick": 182, "type": "wait_slot", "slot": 43, "stack": {"item": "ae2:silicon"}, "timeout": 100},
+                {"tick": 195, "type": "wait_slot", "slot": 44, "stack": {"item": "ae2:printed_silicon"}, "timeout": 300},
+                {"tick": 325, "type": "click", "slot": 44},
+                {"tick": 345, "type": "click", "slot": 6},
+                {"tick": 346, "type": "wait_slot", "slot": 6, "stack": {"item": "ae2:printed_silicon"}, "timeout": 100},
+                {"tick": 350, "type": "wait_slot", "slot": 44, "stack": null, "timeout": 100}
+              ]
+            }
+          }
+        },
+        {"type": "idle", "ticks": 390},
+        {"type": "hide_gui_demo", "id": "inscriber"},
+        {"type": "idle", "ticks": 20},
+        {"type": "mark_finished"}
+      ]
+    }
+  ]
+}

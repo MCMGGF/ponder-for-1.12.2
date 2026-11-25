@@ -103,6 +103,27 @@
 
 各界面分别保留脚本设置的槽位、属性与指针状态。指针只在一次停留于同一界面的期间插值移动。可选的 AE2S 示例通过独立预览适配器展示铭刻器的输出侧面界面。[AE2S 铭刻器示例](../../../../examples/gui_demo/optional/ae2s/config/ponder/ponder_demo/ae2s_inscriber_subgui.json)
 
+### 录制真实方块操作
+
+给 `block_gui` 定义添加与 `source` 同级的 `sandbox`。录制器在独立实例建立测试世界，使用机台和玩家的原生逻辑执行操作。时间轴读取已录制的画面。`source` 接受 `block`、`meta`、`tileNbt` 和 `capture`。左右工具栏或顶边按钮需要相应的录制边距。
+
+| 字段 | 写法 |
+| --- | --- |
+| `inventory` | 可选。以玩家背包编号为键的初始物品表。0–8 为快捷栏，9–35 为主背包。物品格式为 `{"item":"minecraft:coal","count":1}`，可添加 `meta` 和 SNBT 字符串 `nbt`。 |
+| `neighbors` | 可选。每项具有 `block`，可带 `meta`、`tileNbt` 和偏移 `x`、`y`、`z`。偏移默认为 0，三轴中恰有一轴为 ±1。每个相邻面最多一个方块。 |
+| `actions` | 按执行顺序排列的 1–2048 个操作。每项需写 `tick` 和 `type`，同一 tick 按数组顺序执行。tick 表示最早执行时刻，以叠层开始为 0。 |
+
+| 操作 | 参数与效果 |
+| --- | --- |
+| `activate` | 玩家右键激活目标方块。 |
+| `click` | 写 `slot` 或一组 `x`、`y`。槽位编号来自当前容器；界面坐标以当前 GUI 左上角为原点。可写 `button` 指定左键 0、右键 1 或中键 2，默认左键。 |
+| `wait_screen` | `screen` 指定实际 GUI 的简单类名或完整类名。 |
+| `wait_slot` | `slot` 指定当前容器的槽位，`stack` 指定预期物品堆，`null` 表示空槽。 |
+| `wait_nbt` | `nbt` 为非空 SNBT 复合标签，检查目标方块实体在服务端保存的对应字段。 |
+| `close` | 玩家关闭当前界面，后续可再次激活同一个方块。 |
+
+等待操作的 `timeout` 范围为 1–2400 tick，默认为 100。给实际加工和网络响应留足时间。可在关闭、重新打开 GUI 后检查 `wait_nbt`，也可在取出产物后同时检查背包槽和输出槽。带完整步骤的示例见[熔炉与 AE2S 铭刻器](../../../../examples/gui_demo/README.md)。
+
 ## `gui_outline_text`
 
 在父 GUI 叠层内部高亮一个矩形区域，并绑定说明文字。
