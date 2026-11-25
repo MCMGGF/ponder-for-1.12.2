@@ -36,12 +36,12 @@ record SandboxProfile(Path game, Path assets, List<Pack> packs, String version, 
         var repository = mc.getResourcePackRepository();
         for (var entry : repository.getRepositoryEntries()) {
             if (entry.getResourcePack() instanceof AbstractResourcePack pack) {
-                Path source = pack.getResourcePackFile().toPath().toAbsolutePath();
+                Path source = packPath(pack);
                 packs.add(new Pack(source, source.getFileName().toString()));
             }
         }
         if (repository.getServerResourcePack() instanceof AbstractResourcePack serverPack) {
-            Path source = serverPack.getResourcePackFile().toPath().toAbsolutePath();
+            Path source = packPath(serverPack);
             String name = "ponder-server-pack.zip";
             while (hasPackName(packs, name)) name = "_" + name;
             packs.add(new Pack(source, name));
@@ -50,6 +50,11 @@ record SandboxProfile(Path game, Path assets, List<Pack> packs, String version, 
         return new SandboxProfile(mc.gameDir.toPath().toAbsolutePath().normalize(), assets.toPath().toAbsolutePath(),
             List.copyOf(packs), mc.getVersion(), mc.gameSettings.language, mc.gameSettings.guiScale,
             mc.gameSettings.forceUnicodeFont, mc.displayWidth, mc.displayHeight, cp);
+    }
+
+    private static Path packPath(AbstractResourcePack pack) {
+        File file = ReflectionHelper.getPrivateValue(AbstractResourcePack.class, pack, "resourcePackFile", "field_110597_b");
+        return file.toPath().toAbsolutePath();
     }
 
     private static boolean hasPackName(List<Pack> packs, String name) {
@@ -81,17 +86,24 @@ record SandboxProfile(Path game, Path assets, List<Pack> packs, String version, 
 
     private static void hashTree(MessageDigest digest, Path root, byte[] buffer, boolean gameInput) throws IOException {
         if (!Files.exists(root)) return;
+        boolean configuration = gameInput && root.getFileName().toString().equals("config");
         boolean firstFile = true;
         try (var paths = Files.walk(root)) {
             for (Path file : paths.filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)).sorted().toList()) {
                 Path relative = root.relativize(file);
-                if (gameInput && (skipFile(root, file) || separateSceneInput(root, relative) || loadingTimings(root, relative)))
+                String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                if (gameInput && (skipFile(root, file) || separateSceneInput(root, relative) || loadingTimings(root, relative))
+                    || configuration && name.contains("cache") && (name.endsWith(".dat") || name.endsWith(".nbt") || name.endsWith(".bin")))
                     continue;
                 if (firstFile) {
                     update(digest, root.getFileName().toString());
                     firstFile = false;
                 }
                 update(digest, relative.toString());
+                if (configuration && (name.endsWith(".cfg") || name.endsWith(".ini") || name.endsWith(".properties"))) {
+                    hashConfig(digest, file, name);
+                    continue;
+                }
                 update(digest, Long.toString(Files.size(file)));
                 try (InputStream in = Files.newInputStream(file)) {
                     int count;
@@ -99,6 +111,39 @@ record SandboxProfile(Path game, Path assets, List<Pack> packs, String version, 
                 }
             }
         }
+    }
+
+    private static final Pattern FORGE_LIST = Pattern.compile("[A-Za-z]:.+\\s*<");
+
+    private static void hashConfig(MessageDigest digest, Path file, String name) throws IOException {
+        MessageDigest content = SandboxRecordings.digest();
+        long length = 0;
+        boolean continuation = false;
+        boolean list = false;
+        try (var reader = Files.newBufferedReader(file, StandardCharsets.ISO_8859_1)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String trimmed = line.strip();
+                if (!list && !continuation && (trimmed.startsWith("#")
+                    || name.endsWith(".ini") && trimmed.startsWith(";")
+                    || name.endsWith(".properties") && trimmed.startsWith("!"))) continue;
+                byte[] bytes = line.getBytes(StandardCharsets.ISO_8859_1);
+                content.update(bytes);
+                content.update((byte) '\n');
+                length += bytes.length + 1L;
+                if (list) {
+                    list = !trimmed.equals(">");
+                    continue;
+                }
+                if (!continuation && name.endsWith(".cfg") && trimmed.endsWith("<"))
+                    list = FORGE_LIST.matcher(trimmed).matches();
+                int end = line.length();
+                while (end > 0 && line.charAt(end - 1) == '\\') end--;
+                continuation = (line.length() - end) % 2 != 0;
+            }
+        }
+        update(digest, Long.toString(length));
+        digest.update(content.digest());
     }
 
     // Each resolved scene has its own digest. Editing one JSON file must leave unrelated recordings usable.

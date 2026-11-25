@@ -95,7 +95,7 @@ public final class SandboxRecordings {
         try {
             SandboxProfile profile = demos.isEmpty() ? null : SandboxProfile.capture(mc);
             executor.execute(() -> refresh(current, demos, profile));
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | LinkageError failure) {
             Ponder.LOGGER.warn("Could not inspect the client profile for sandbox GUI recording", failure);
         }
     }

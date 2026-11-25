@@ -2,6 +2,7 @@ package net.createmod.ponder.foundation.ui.sandbox;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -9,6 +10,37 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SandboxProfileFingerprintTest {
     @TempDir Path root;
+
+    @Test
+    void generatedCommentsAndBinaryCachesDoNotInvalidateRecordings() throws Exception {
+        Path game = Files.createDirectory(root.resolve("game"));
+        SandboxProfile profile = new SandboxProfile(game, root, List.of(), "1.12.2", "en_us", 1, false, 800, 600, "");
+        String[][] configs = {
+            {"IC2.ini", "; created Monday", "rubberTree = true"},
+            {"splash.properties", "! today", "textColor=0xABFFFF"},
+            {"InvTweaks/InvTweaks.cfg", "#Wed Nov 25 16:55:38 CST 2026", "autoRefill=true"},
+            {"astralsorcery/amulet_enchantments.cfg", "    # [default: generated registry order]", "S:data <\n    # literal list entry\n>"},
+            {"continued.properties", "# generated", "name=line\\\n#value\nraw=é"}
+        };
+        for (String[] cfg : configs) write(game, "config/" + cfg[0],
+            (cfg[1] + "\r\n" + cfg[2]).getBytes(StandardCharsets.ISO_8859_1));
+        String original = profile.fingerprint();
+        for (String[] cfg : configs) write(game, "config/" + cfg[0],
+            (cfg[1] + " changed length\n" + cfg[2]).getBytes(StandardCharsets.ISO_8859_1));
+        for (String file : List.of("stellarcore_blockstate_cache_a71.dat", "tconstruct_oredictcache.dat"))
+            write(game, "config/" + file, new byte[]{1, 0, -1});
+        assertEquals(original, profile.fingerprint());
+        for (String[] cfg : configs) {
+            Path file = game.resolve("config").resolve(cfg[0]);
+            byte[] before = Files.readAllBytes(file);
+            String changed = cfg[2].replace("#value", "#other").replace("# literal", "# other");
+            if (changed.equals(cfg[2])) changed += "2";
+            Files.writeString(file, changed, StandardCharsets.ISO_8859_1);
+            assertNotEquals(original, profile.fingerprint(), cfg[0]);
+            Files.write(file, before);
+        }
+        assertEquals(original, profile.fingerprint());
+    }
 
     @Test
     void sceneEditsAreIndependentButMachineConfigurationAndPackContentsInvalidateTheEnvironment() throws Exception {
