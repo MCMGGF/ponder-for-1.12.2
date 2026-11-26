@@ -49,6 +49,7 @@ public final class DetachedPonderWorld extends World {
     private static final int MAX_CACHED_CHUNKS = 16;
     private static final Set<String> WARNED_TILES = Collections.synchronizedSet(new HashSet<String>());
 
+    private final boolean mergeTileDefaults;
     private final Map<BlockPos, IBlockState> states = new LinkedHashMap<BlockPos, IBlockState>();
     private final Map<BlockPos, NBTTagCompound> tileData = new LinkedHashMap<BlockPos, NBTTagCompound>();
     private final Map<BlockPos, TileEntity> tiles = new LinkedHashMap<BlockPos, TileEntity>();
@@ -56,9 +57,14 @@ public final class DetachedPonderWorld extends World {
     private final Set<BlockPos> failedTiles = new HashSet<BlockPos>();
 
     public DetachedPonderWorld() {
+        this(false);
+    }
+
+    DetachedPonderWorld(boolean mergeTileDefaults) {
         super(new SaveHandlerMP(), new WorldInfo(
             new WorldSettings(0L, GameType.CREATIVE, false, false, WorldType.FLAT), "Ponder Preview"),
             new WorldProviderSurface(), new Profiler(), true);
+        this.mergeTileDefaults = mergeTileDefaults;
         provider.setWorld(this);
         chunkProvider = createChunkProvider();
         mapStorage = new MapStorage(null);
@@ -159,7 +165,16 @@ public final class DetachedPonderWorld extends World {
             tiles.put(key, tile);
             NBTTagCompound nbt = tileData.get(key);
             if (nbt != null) {
-                NBTTagCompound displayNbt = nbt.copy();
+                NBTTagCompound displayNbt;
+                if (mergeTileDefaults) {
+                    // Native GUI fixtures describe overrides of a freshly placed tile.
+                    displayNbt = tile.writeToNBT(new NBTTagCompound());
+                    String id = displayNbt.getString("id");
+                    displayNbt.merge(nbt);
+                    displayNbt.setString("id", id);
+                } else {
+                    displayNbt = nbt.copy();
+                }
                 displayNbt.setInteger("x", Vec3iAccessor.x(pos));
                 displayNbt.setInteger("y", Vec3iAccessor.y(pos));
                 displayNbt.setInteger("z", Vec3iAccessor.z(pos));

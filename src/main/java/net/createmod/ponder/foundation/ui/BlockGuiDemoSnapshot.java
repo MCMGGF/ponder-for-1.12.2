@@ -45,6 +45,7 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
 
     private final BlockGuiDemoDefinition definition;
     private final int startTick;
+    private final boolean pendingPreview;
     private final Map<Screen, Snapshot> snapshots = new ConcurrentHashMap<>();
     private final Set<Screen> unavailable = new HashSet<>();
     private Screen active;
@@ -56,17 +57,18 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
     private State applied;
     private float appliedTick;
 
-    private BlockGuiDemoSnapshot(BlockGuiDemoDefinition definition, int startTick) {
+    private BlockGuiDemoSnapshot(BlockGuiDemoDefinition definition, int startTick, boolean pendingPreview) {
         this.definition = definition;
         this.startTick = startTick;
+        this.pendingPreview = pendingPreview;
     }
 
     static SnapshotProvider provider(BlockGuiDemoDefinition definition, int startTick) {
-        return new BlockGuiDemoSnapshot(definition, startTick);
+        return new BlockGuiDemoSnapshot(definition, startTick, false);
     }
 
     static BlockGuiDemoSnapshot preview(BlockGuiDemoDefinition definition, int startTick) {
-        return new BlockGuiDemoSnapshot(definition, startTick);
+        return new BlockGuiDemoSnapshot(definition, startTick, true);
     }
 
     @Override
@@ -234,7 +236,7 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
             || MmcePreviewSafety.isNativeControllerBlock(block.getClass())) {
             throw new IllegalArgumentException("Unsupported preview block " + definition.block());
         }
-        world = new DetachedPonderWorld();
+        world = new DetachedPonderWorld(pendingPreview);
         world.putBlock(POS, block.getStateFromMeta(definition.meta()), definition.tileNbt());
         player = NativeGuiPreviewScope.player(mc, world);
         player.setPosition(POS.getX() + 0.5, POS.getY() + 0.5, POS.getZ() + 0.5);
