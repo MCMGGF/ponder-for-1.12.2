@@ -11,7 +11,7 @@
 | Thermal Expansion 5.5.7.1 | [红石炉](optional/thermalexpansion/config/ponder/ponder_demo/sandbox_thermal_furnace.json) | `/ponderui ponder_demo:sandbox_thermal_furnace 0` |
 | Thermal Expansion 5.5.7.1 | [磨粉机](optional/thermalexpansion/config/ponder/ponder_demo/sandbox_thermal_pulverizer.json) | `/ponderui ponder_demo:sandbox_thermal_pulverizer 0` |
 
-可以运行 `gradlew sandboxExampleZips`，将 `build/sandbox-examples` 中所需的 ZIP 解压到实例目录。启动后客户端会安排录制。游戏运行中改动本地场景时执行 `/ponder reload`。改动资源包时按 F3+T。录制完成后，在世界内执行表中的命令。Ponder 时间轴可暂停、回退和重播已录制的画面。
+可以运行 `gradlew sandboxExampleZips`，将 `build/sandbox-examples` 中所需的 ZIP 解压到实例目录。启动后客户端会安排录制。在世界内执行表中的命令即可打开思索。配置了 `preview` 的场景可先显示机器的只读主界面，录制就绪后自动接续实际演示。Ponder 时间轴可暂停、回退和重播。游戏运行中改动本地场景时执行 `/ponder reload`，改动资源包后按 F3+T。
 
 首次录制会在后台启动游戏客户端，加载整合包的模组并执行配方。录制进程的堆上限默认取主客户端的堆上限，最高 4096 MiB。可通过启动参数 `-Dponder.sandbox.maxHeapMiB=6144` 调整。相同场景和环境会复用实例 `ponder-gui-cache/recordings` 中的录制。启动时，若其他客户端正在使用该缓存，本次会跳过清理。空闲时优先清除较早的旧版本，录制缓存的清理目标为 512 MiB。当前场景所需的录制可以超过该值。
 
@@ -21,12 +21,13 @@
 
 ### 为其他机器编写录制脚本
 
-复制熔炉场景，修改场景 ID、展示的方块以及 `show_gui_demo.demo`。录制定义包含 `source` 和 `sandbox` 两个对象。
+复制熔炉场景，修改场景 ID、展示的方块以及 `show_gui_demo.demo`。录制定义需要 `source` 和 `sandbox`，并可添加 `preview`。
 
 | 字段 | 填写方式 |
 | --- | --- |
 | `source` | `type` 填 `block_gui`，`block` 填机器的注册 ID。`meta` 默认 0，范围 0–15。可用 `tileNbt` 提供初始化方块实体的 SNBT 字符串。 |
 | `source.capture` | 可选。用 `left`、`top`、`right`、`bottom` 分别扩展容器截图的四边，每边 0–512 个 GUI 逻辑像素，默认 0。裁剪范围须能完整放入实际游戏窗口。 |
+| `preview` | 可选。与 `source`、`sandbox` 同级。填 `{}` 使用原版容器入口，或填 `{"guiId":6}` 调用 Forge 客户端菜单工厂。可用 `mod` 指定菜单工厂所属模组，默认取方块注册 ID 的命名空间。预览使用初始方块状态，只读。未配置或构建失败时显示录制状态。已有录制缓存时直接播放。 |
 | `sandbox.inventory` | 可选。对象的键是玩家物品栏编号，0–8 为快捷栏，9–35 为背包；开局选中 0。物品写成 `{"item":"minecraft:coal","count":1,"meta":0}`。`count` 默认 1，范围 1–127；`meta` 默认 0，范围 0–32767；可选 `nbt` 为 SNBT 字符串。 |
 | `sandbox.neighbors` | 可选。最多放六个与机器面相邻的方块。每项填写 `block` 和相对位移 `x`、`y`、`z`，省略的轴为 0，恰有一轴取 1 或 −1。每面只放一次，可附 `meta`、`tileNbt`，例如在机器东侧放能源方块。 |
 | `sandbox.actions` | 按 `tick` 升序排列 1–2048 个动作。录制从 0 开始，最迟到 23999 tick。`tick` 是最早执行时间，同 tick 按数组顺序逐个执行。等待期间机器继续运转，后续动作等条件满足才开始。外层 `show_gui_demo.duration` 要给加工和结果展示留出时间。 |

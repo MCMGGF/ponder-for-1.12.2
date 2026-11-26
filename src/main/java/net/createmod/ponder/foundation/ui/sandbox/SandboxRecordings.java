@@ -1,6 +1,7 @@
 package net.createmod.ponder.foundation.ui.sandbox;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -74,8 +75,13 @@ public final class SandboxRecordings {
     public static String statusMessage(String id) { return INSTANCE.status.get(id); }
 
     public static SnapshotProvider onView(JsonObject definition, int startTick) {
-        String id = id(definition);
-        return RecordedGuiPlayback.provider(id, startTick, () -> INSTANCE.requestView(id, definition));
+        return onView(definition, startTick, null);
+    }
+
+    public static SnapshotProvider onView(JsonObject definition, int startTick, RecordedGuiPlayback.PendingPreview preview) {
+        JsonObject request = recordingInput(definition);
+        String id = id(request);
+        return RecordedGuiPlayback.provider(id, startTick, () -> INSTANCE.requestView(id, request), preview);
     }
 
     private void requestView(String id, JsonObject definition) {
@@ -87,7 +93,14 @@ public final class SandboxRecordings {
     }
 
     public static String id(JsonObject definition) {
-        return HexFormat.of().formatHex(digest().digest(definition.toString().getBytes(StandardCharsets.UTF_8)));
+        return HexFormat.of().formatHex(digest().digest(recordingInput(definition).toString().getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static JsonObject recordingInput(JsonObject definition) {
+        if (!definition.has("preview")) return definition;
+        JsonObject recording = new JsonParser().parse(definition.toString()).getAsJsonObject();
+        recording.remove("preview");
+        return recording;
     }
 
     static MessageDigest digest() {
@@ -112,7 +125,7 @@ public final class SandboxRecordings {
         ExternalPonderScenes.visitGuiDemos(mc.getResourceManager(), timeline -> {
             if (timeline instanceof BlockGuiDemoDefinition demo && demo.sandbox() != null
                     && ForgeRegistries.BLOCKS.containsKey(demo.block())) {
-                JsonObject json = demo.rawJson();
+                JsonObject json = recordingInput(demo.rawJson());
                 demos.putIfAbsent(id(json), json);
             }
         });

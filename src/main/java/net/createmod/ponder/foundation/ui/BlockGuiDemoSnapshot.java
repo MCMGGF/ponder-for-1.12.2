@@ -16,11 +16,15 @@ import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.ResettableSn
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.Snapshot;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.SnapshotProvider;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.SnapshotRenderer;
+import net.createmod.ponder.foundation.ui.sandbox.RecordedGuiPlayback.PendingPreview;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.Item;
@@ -33,10 +37,11 @@ import net.minecraftforge.fml.common.ModContainer;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import org.lwjgl.opengl.GL11;
 
-/** Renders a captured block screen using only scene-authored container updates. */
-final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, SnapshotRenderer {
+/** Renders a detached block screen, with optional scene-authored container updates. */
+final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, SnapshotRenderer, PendingPreview {
     private static final BlockPos POS = new BlockPos(0, 64, 0);
     private static final int OUTSIDE_GUI = -4096;
+    private static final int PREVIEW_FOOTER_HEIGHT = 26;
 
     private final BlockGuiDemoDefinition definition;
     private final int startTick;
@@ -46,6 +51,8 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
     private DetachedPonderWorld world;
     private EntityPlayerSP player;
     private GuiContainer gui;
+    private Snapshot pendingSnapshot;
+    private String pendingStatusKey;
     private State applied;
     private float appliedTick;
 
@@ -56,6 +63,59 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
 
     static SnapshotProvider provider(BlockGuiDemoDefinition definition, int startTick) {
         return new BlockGuiDemoSnapshot(definition, startTick);
+    }
+
+    static BlockGuiDemoSnapshot preview(BlockGuiDemoDefinition definition, int startTick) {
+        return new BlockGuiDemoSnapshot(definition, startTick);
+    }
+
+    @Override
+    public Snapshot previewSnapshot(float tick, String statusKey) {
+        if (!visibleAt(tick)) return null;
+        prepare(startTick);
+        Screen main = definition.screenAt(0F);
+        if (!main.equals(active)) return null;
+
+        if (pendingSnapshot == null || !statusKey.equals(pendingStatusKey)) {
+            Snapshot nativeSnapshot = snapshotFor(main);
+            pendingStatusKey = statusKey;
+            pendingSnapshot = Snapshot.liveRenderer(nativeSnapshot.displayWidth,
+                nativeSnapshot.displayHeight + PREVIEW_FOOTER_HEIGHT, true,
+                (x, y, width, height, ignored, fade) -> renderPending(main, statusKey, x, y, width, height, fade));
+        }
+        return pendingSnapshot;
+    }
+
+    private void renderPending(Screen main, String statusKey, int x, int y, int width, int height, float fade) {
+        int alpha = Math.min(255, Math.round(255 * fade));
+        if (alpha < 4 || width <= 0 || height <= 0 || !main.equals(active)) return;
+        Minecraft mc = Minecraft.getMinecraft();
+        FontRenderer font = mc.fontRenderer;
+        int footerHeight = Math.min(height, Math.max(PREVIEW_FOOTER_HEIGHT, 2 * font.FONT_HEIGHT + 6));
+        int footerY = y + height - footerHeight;
+        if (footerY > y) {
+            float itemZ = mc.getRenderItem().zLevel;
+            try {
+                PreviewNativeRenderGuard.run(() -> {
+                    try (NativeGuiPreviewScope scope = new NativeGuiPreviewScope(mc, player)) {
+                        drawScreen(main, x, y, width, footerY - y, 0F, fade);
+                    }
+                });
+            } catch (RuntimeException | LinkageError failure) {
+                markUnavailable(main, failure);
+            } finally {
+                mc.getRenderItem().zLevel = itemZ;
+            }
+        }
+        Gui.drawRect(x, footerY, x + width, y + height, alpha << 24 | 0x151D23);
+        drawPendingLabel(font, "ponder.sandbox.preview", x, footerY + 2, width, y + height, alpha);
+        drawPendingLabel(font, statusKey, x, footerY + font.FONT_HEIGHT + 4, width, y + height, alpha);
+    }
+
+    private static void drawPendingLabel(FontRenderer font, String key, int x, int y, int width, int bottom, int alpha) {
+        if (width <= 8 || y + font.FONT_HEIGHT > bottom) return;
+        PreviewTextLayout label = PreviewTextLayout.centered(font, I18n.format(key), x + 4, x + width - 4);
+        font.drawStringWithShadow(label.text, label.x, y, alpha << 24 | 0xFFFFFF);
     }
 
     @Override
@@ -293,6 +353,8 @@ final class BlockGuiDemoSnapshot implements ResettableSnapshotProvider, Snapshot
         active = null;
         gui = null;
         player = null;
+        pendingSnapshot = null;
+        pendingStatusKey = null;
         applied = null;
         if (world != null) {
             world.clear();

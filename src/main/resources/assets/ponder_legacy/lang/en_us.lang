@@ -225,5 +225,6 @@ ponder.snapshot.thermal.panel.augment=Augments
 ponder.snapshot.thermal.panel.config=Side config
 ponder.snapshot.thermal.panel.redstone=Redstone
 ponder.sandbox.waiting=Preparing machine interface…
+ponder.sandbox.preview=Read-only interface preview
 ponder.sandbox.recording=Recording machine actions…
 ponder.sandbox.failed=Recording failed. See the game log.

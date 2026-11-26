@@ -24,6 +24,7 @@
           "duration": 380,
           "demo": {
             "source": {"type": "block_gui", "block": "thermalexpansion:machine", "meta": 1, "tileNbt": "{Energy:20000}", "capture": {"left": 96, "right": 24}},
+            "preview": {"guiId": 0},
             "sandbox": {
               "inventory": {"9": {"item": "minecraft:bone"}},
               "actions": [

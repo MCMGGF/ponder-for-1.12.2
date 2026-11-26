@@ -91,6 +91,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     private final NavigableMap<Integer, ScreenTracks> screenChanges = new TreeMap<>();
     private final int lastKeyframeTick;
     private final SandboxGuiScript sandbox;
+    private final boolean preview;
     private final String rawJson;
 
     private BlockGuiDemoDefinition(JsonObject root, JsonObject source, NavigableMap<Integer, JsonObject> frames) {
@@ -98,7 +99,14 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
         meta = integer(source, "meta", 0, 0, 15);
         tileNbt = nbt(source, "tileNbt");
         Screen defaults = new Screen(MAIN_SCREEN, null, block.getNamespace(), null, Insets.NONE);
-        main = new ScreenTracks(readScreen(source, MAIN_SCREEN, "source", defaults));
+        Screen mainScreen = readScreen(source, MAIN_SCREEN, "source", defaults);
+        preview = root.has("preview");
+        if (preview) {
+            JsonObject previewSpec = object(root.get("preview"), "preview");
+            fields(previewSpec, Set.of("guiId", "mod"));
+            mainScreen = readScreen(previewSpec, MAIN_SCREEN, "preview", mainScreen);
+        }
+        main = new ScreenTracks(mainScreen);
         sandbox = root.has("sandbox") ? SandboxGuiScript.parse(object(root.get("sandbox"), "sandbox"), main.screen.capture()) : null;
         rawJson = root.toString();
         Map<String, ScreenTracks> tracksByScreen = readScreens(root.get("screens"), main);
@@ -127,7 +135,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
 
     public static BlockGuiDemoDefinition parse(JsonObject root) {
         boolean recorded = root.has("sandbox");
-        fields(root, recorded ? Set.of("source", "sandbox") : Set.of("source", "screens", "keyframes"));
+        fields(root, recorded ? Set.of("source", "sandbox", "preview") : Set.of("source", "screens", "keyframes"));
         JsonObject source = object(root.get("source"), "source");
         fields(source, recorded ? Set.of("type", "block", "meta", "tileNbt", "capture")
             : Set.of("type", "block", "meta", "tileNbt", "guiId", "mod", "factory", "capture"));
@@ -147,7 +155,8 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     @Override
     public SnapshotProvider provider(int startTick) {
         if (sandbox() != null) {
-            return SandboxRecordings.onView(rawJson(), startTick);
+            return SandboxRecordings.onView(rawJson(), startTick,
+                preview ? BlockGuiDemoSnapshot.preview(this, startTick) : null);
         }
         return BlockGuiDemoSnapshot.provider(this, startTick);
     }

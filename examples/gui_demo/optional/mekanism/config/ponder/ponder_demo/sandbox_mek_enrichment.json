@@ -26,6 +26,7 @@
               "tileNbt": "{electricityStored:20000.0d}",
               "capture": {"left": 30, "right": 32}
             },
+            "preview": {"guiId": 3},
             "sandbox": {
               "inventory": {"9": {"item": "minecraft:redstone"}},
               "actions": [

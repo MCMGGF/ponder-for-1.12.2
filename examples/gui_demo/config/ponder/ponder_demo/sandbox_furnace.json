@@ -19,6 +19,7 @@
           "duration": 330,
           "demo": {
             "source": {"type": "block_gui", "block": "minecraft:furnace", "meta": 2},
+            "preview": {},
             "sandbox": {
               "inventory": {
                 "9": {"item": "minecraft:iron_ore"},

@@ -33,6 +33,12 @@ import net.minecraft.util.ResourceLocation;
 
 /** Timeline playback uses only PNGs from a completed worker generation. */
 public final class RecordedGuiPlayback implements ResettableSnapshotProvider, SnapshotRenderer {
+    public interface PendingPreview {
+        Snapshot previewSnapshot(float tick, String statusKey);
+
+        default void reset() { }
+    }
+
     private static final Map<String, RecordingFrames> RECORDINGS = new ConcurrentHashMap<>();
     private static final ThreadPoolExecutor READER = new ThreadPoolExecutor(0, 1, 30, TimeUnit.SECONDS,
         new ArrayBlockingQueue<>(8), task -> {
@@ -46,6 +52,8 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
     private final String id;
     private final int startTick;
     private final Runnable onView;
+    private final PendingPreview preview;
+    private boolean showingPreview;
     private Snapshot statusSnapshot;
     private RecordingFrames recording;
     private Snapshot snapshot;
@@ -56,10 +64,11 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
     private Frame next;
     private FutureTask<BufferedImage> pending;
 
-    private RecordedGuiPlayback(String id, int startTick, Runnable onView) {
+    private RecordedGuiPlayback(String id, int startTick, Runnable onView, PendingPreview preview) {
         this.id = id;
         this.startTick = startTick;
         this.onView = onView;
+        this.preview = preview;
     }
 
     public static SnapshotProvider provider(String id, int startTick) {
@@ -67,7 +76,11 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
     }
 
     public static SnapshotProvider provider(String id, int startTick, Runnable onView) {
-        return new RecordedGuiPlayback(id, startTick, onView);
+        return provider(id, startTick, onView, null);
+    }
+
+    public static SnapshotProvider provider(String id, int startTick, Runnable onView, PendingPreview preview) {
+        return new RecordedGuiPlayback(id, startTick, onView, preview);
     }
 
     public static void publish(String id, Path immutableGeneration) throws IOException {
@@ -90,13 +103,20 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
         if (recording == null && onView != null) {
             onView.run();
             recording = RECORDINGS.get(id);
-            if (recording == null && SandboxRecordings.statusMessage(id) != null) {
+            String status = SandboxRecordings.statusMessage(id);
+            if (recording == null && status != null) {
                 if (statusSnapshot == null)
                     statusSnapshot = Snapshot.liveRenderer(176, 40, true, this::renderStatus);
+                Snapshot nativePreview = preview == null ? null : preview.previewSnapshot(tick, status);
+                if (nativePreview != null) {
+                    showingPreview = true;
+                    return nativePreview;
+                }
                 return statusSnapshot;
             }
         }
         if (recording == null) return null;
+        clearPreview();
         int index = recording.indexAt((int) (tick - startTick));
         if (recording.hidden(index)) return null;
         Frame frame = recording.frame(index);
@@ -230,8 +250,17 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
     @Override
     public void reset() {
         releaseTextures();
+        clearPreview();
+        statusSnapshot = null;
         recording = null;
         snapshot = null;
         failed = null;
+    }
+
+    private void clearPreview() {
+        if (showingPreview) {
+            showingPreview = false;
+            preview.reset();
+        }
     }
 }

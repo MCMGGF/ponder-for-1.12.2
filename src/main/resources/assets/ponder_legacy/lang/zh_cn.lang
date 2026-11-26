@@ -225,5 +225,6 @@ ponder.snapshot.thermal.panel.augment=强化面板
 ponder.snapshot.thermal.panel.config=侧面配置
 ponder.snapshot.thermal.panel.redstone=红石控制
 ponder.sandbox.waiting=正在准备机器界面…
+ponder.sandbox.preview=只读界面预览
 ponder.sandbox.recording=正在后台录制机器操作…
 ponder.sandbox.failed=界面录制失败，请查看游戏日志。

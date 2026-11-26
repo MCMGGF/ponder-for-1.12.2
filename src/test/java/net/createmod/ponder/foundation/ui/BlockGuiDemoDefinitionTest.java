@@ -318,6 +318,23 @@ class BlockGuiDemoDefinitionTest {
     }
 
     @Test
+    void optionalRecordingPreviewInheritsCaptureAndAcceptsOnlyClientMenuFields() {
+        String demo = """
+            {"source":{"type":"block_gui","block":"sample:machine","capture":{"right":35}},
+             "sandbox":{"actions":[{"tick":0,"type":"activate"}]},"preview":%s}
+            """;
+        assertNull(parse(demo.formatted("{}")).screenAt(0).guiId());
+        assertEquals(new BlockGuiDemoDefinition.Screen("main", 6, "sample", null,
+            new BlockGuiDemoDefinition.Insets(0, 0, 35, 0)),
+            parse(demo.formatted("{\"guiId\":6}")).screenAt(0));
+        assertEquals("sample_client", parse(demo.formatted("{\"guiId\":6,\"mod\":\"sample_client\"}"))
+            .screenAt(0).guiModId());
+        for (String invalid : Set.of("null", "{\"mod\":\"sample\"}", "{\"factory\":\"sample:main\"}")) {
+            assertThrows(IllegalArgumentException.class, () -> parse(demo.formatted(invalid)), invalid);
+        }
+    }
+
+    @Test
     void sandboxRejectsMalformedConditionsAndMutationShortcuts() {
         String source = "{\"type\":\"block_gui\",\"block\":\"minecraft:furnace\"}";
         for (String action : Set.of(

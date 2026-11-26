@@ -19,7 +19,6 @@ import net.createmod.ponder.foundation.PonderIndex;
 import net.createmod.ponder.foundation.PonderScene;
 import net.createmod.ponder.foundation.registration.PonderComponentMatcher;
 import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition;
-import net.createmod.ponder.foundation.ui.sandbox.SandboxRecordings;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
@@ -256,7 +255,7 @@ public final class ThermalExpansionScenes {
             scene.idle(30);
             PonderScene.OverlayEvent gui = bindMachineTarget(scene.getScene().createOverlayEvent(MAIN_GUI_DURATION))
                 .guiSnapshot(MACHINE_TABS).overlayId("main").offset(0, MAIN_GUI_OFFSET_Y).placeNearTarget(true);
-            gui.setGuiSnapshotProvider(SandboxRecordings.onView(thermalRecording(spec.machineMeta), gui.getTick()));
+            gui.setGuiSnapshotProvider(BlockGuiDemoDefinition.parse(thermalRecording(spec.machineMeta)).provider(gui.getTick()));
             scene.idle(MAIN_GUI_DURATION);
             scene.markAsFinished();
             return;

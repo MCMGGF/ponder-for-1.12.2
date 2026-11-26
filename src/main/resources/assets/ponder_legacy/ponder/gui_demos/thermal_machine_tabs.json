@@ -5,6 +5,7 @@
     "tileNbt": "{Level:1b,Energy:20000}",
     "capture": {"left": 24, "right": 112}
   },
+  "preview": {"guiId": 0},
   "sandbox": {
     "actions": [
       {"tick": 0, "type": "activate"},

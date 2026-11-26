@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.Set;
 import javax.imageio.ImageIO;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.SnapshotProvider;
+import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.Snapshot;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.ResettableSnapshotProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -45,6 +46,39 @@ class RecordedGuiPlaybackTest {
         assertEquals(15, player.provide(12).displayWidth);
         assertNull(player.provide(18));
         assertEquals(1, calls.get());
+    }
+
+    @Test
+    void pendingPreviewReleasesItsScreenOnPublicationAndRetainsRecordingIdentity() throws Exception {
+        var raw = new com.google.gson.JsonObject();
+        raw.addProperty("test", "native-preview");
+        String id = SandboxRecordings.id(raw);
+        raw.add("preview", new com.google.gson.JsonObject());
+        assertEquals(id, SandboxRecordings.id(raw));
+        assertTrue(raw.has("preview"));
+
+        var preview = new RecordedGuiPlayback.PendingPreview() {
+            private int resets;
+
+            @Override
+            public Snapshot previewSnapshot(float tick, String statusKey) {
+                assertEquals("ponder.sandbox.waiting", statusKey);
+                return Snapshot.liveRenderer(192, 128, true, (x, y, width, height, currentTick, fade) -> { });
+            }
+
+            @Override
+            public void reset() { resets++; }
+        };
+        SnapshotProvider player = SandboxRecordings.onView(raw, 20, preview);
+        assertNull(player.provide(19));
+        assertEquals(192, player.provide(25).displayWidth);
+        assertTrue(player.waitingForRecording());
+        RecordedGuiPlayback.publish(id, generation("preview-ready", 14, 24));
+        assertFalse(player.waitingForRecording());
+        assertEquals(24, player.provide(25).displayWidth);
+        assertEquals(1, preview.resets);
+        assertNull(player.provide(26));
+        assertEquals(1, preview.resets);
     }
 
     @Test
