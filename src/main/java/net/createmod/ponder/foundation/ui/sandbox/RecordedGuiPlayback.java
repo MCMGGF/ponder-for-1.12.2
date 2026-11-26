@@ -116,8 +116,12 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
             }
         }
         if (recording == null) return null;
-        clearPreview();
         int index = recording.indexAt((int) (tick - startTick));
+        if (showingPreview && recording.beforeFirstVisible(index)) {
+            Snapshot nativePreview = preview.previewSnapshot(tick, "ponder.sandbox.ready");
+            if (nativePreview != null) return nativePreview;
+        }
+        clearPreview();
         if (recording.hidden(index)) return null;
         Frame frame = recording.frame(index);
         if (snapshot == null || snapshot.displayWidth != frame.width() || snapshot.displayHeight != frame.height())

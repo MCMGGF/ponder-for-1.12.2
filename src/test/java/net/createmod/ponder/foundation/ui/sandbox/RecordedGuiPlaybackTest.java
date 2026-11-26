@@ -82,6 +82,54 @@ class RecordedGuiPlaybackTest {
     }
 
     @Test
+    void publishedRecordingKeepsColdPreviewUntilFirstVisibleFrameOnly() throws Exception {
+        var raw = new com.google.gson.JsonObject();
+        raw.addProperty("test", "leading-hidden-frames");
+        String id = SandboxRecordings.id(raw);
+        var preview = new RecordedGuiPlayback.PendingPreview() {
+            private int resets;
+            private String lastStatus;
+
+            @Override
+            public Snapshot previewSnapshot(float tick, String statusKey) {
+                lastStatus = statusKey;
+                return Snapshot.liveRenderer(192, 128, true, (x, y, width, height, currentTick, fade) -> { });
+            }
+
+            @Override
+            public void reset() { resets++; }
+        };
+        SnapshotProvider cold = SandboxRecordings.onView(raw, 20, preview);
+        SnapshotProvider seeking = SandboxRecordings.onView(raw, 20, preview);
+        assertEquals(192, cold.provide(21).displayWidth);
+        assertEquals(192, seeking.provide(21).displayWidth);
+        assertTrue(cold.waitingForRecording());
+
+        Path generation = generation("leading-hidden", 14, 24);
+        Files.writeString(generation.resolve("frames.json"),
+            """
+            {"duration":10,"frames":[{"tick":0,"file":"frames/a.png","hidden":true},
+             {"tick":5,"file":"frames/b.png"},{"tick":6,"file":"frames/a.png","hidden":true},
+             {"tick":8,"file":"frames/b.png"}]}
+            """);
+        RecordedGuiPlayback.publish(id, generation);
+        assertFalse(cold.waitingForRecording());
+        assertEquals(192, cold.provide(24).displayWidth);
+        assertEquals("ponder.sandbox.ready", preview.lastStatus);
+        assertEquals(0, preview.resets);
+        assertEquals(24, cold.provide(25).displayWidth);
+        assertNull(cold.provide(26));
+        assertNull(cold.provide(21));
+        assertEquals(1, preview.resets);
+
+        assertNull(seeking.provide(26));
+        assertNull(seeking.provide(21));
+        assertEquals(2, preview.resets);
+        assertNull(SandboxRecordings.onView(raw, 20, preview).provide(21));
+        assertEquals(2, preview.resets);
+    }
+
+    @Test
     void sparseFramesSeekInBothDirectionsAndHoldTheLastFrame() throws Exception {
         Path generation = generation("first", 11, 22);
         RecordedGuiPlayback.publish("seeking", generation);

@@ -21,11 +21,13 @@ final class RecordingFrames {
     private final int[] ticks;
     private final Frame[] frames;
     private final boolean[] hidden;
+    private final int firstVisibleIndex;
 
-    private RecordingFrames(int count) {
-        ticks = new int[count];
-        frames = new Frame[count];
-        hidden = new boolean[count];
+    private RecordingFrames(int[] ticks, Frame[] frames, boolean[] hidden, int firstVisibleIndex) {
+        this.ticks = ticks;
+        this.frames = frames;
+        this.hidden = hidden;
+        this.firstVisibleIndex = firstVisibleIndex;
     }
 
     static RecordingFrames read(Path directory) throws IOException {
@@ -38,12 +40,15 @@ final class RecordingFrames {
             JsonArray entries = json.getAsJsonArray("frames");
             if (duration < 1 || duration > 24000 || entries.size() < 1 || entries.size() > duration)
                 throw new IOException("Invalid recording duration or frame count");
-            RecordingFrames result = new RecordingFrames(entries.size());
+            int[] ticks = new int[entries.size()];
+            Frame[] frames = new Frame[entries.size()];
+            boolean[] hidden = new boolean[entries.size()];
+            int firstVisibleIndex = -1;
             Map<Path, Frame> validated = new HashMap<>();
             for (int i = 0; i < entries.size(); i++) {
                 JsonObject entry = entries.get(i).getAsJsonObject();
                 int tick = integer(entry, "tick");
-                if ((i == 0 ? tick != 0 : tick <= result.ticks[i - 1]) || tick >= duration)
+                if ((i == 0 ? tick != 0 : tick <= ticks[i - 1]) || tick >= duration)
                     throw new IOException("Invalid recording frame tick " + tick);
                 String name = entry.get("file").getAsString();
                 if (!name.matches("(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\\.png"))
@@ -58,11 +63,12 @@ final class RecordingFrames {
                     frame = new Frame(path, header.getInt(16), header.getInt(20));
                     validated.put(path, frame);
                 }
-                result.ticks[i] = tick;
-                result.frames[i] = frame;
-                result.hidden[i] = entry.has("hidden") && entry.get("hidden").getAsBoolean();
+                ticks[i] = tick;
+                frames[i] = frame;
+                hidden[i] = entry.has("hidden") && entry.get("hidden").getAsBoolean();
+                if (!hidden[i] && firstVisibleIndex < 0) firstVisibleIndex = i;
             }
-            return result;
+            return new RecordingFrames(ticks, frames, hidden, firstVisibleIndex);
         } catch (RuntimeException invalid) {
             throw new IOException("Malformed recording manifest " + manifest, invalid);
         }
@@ -88,5 +94,6 @@ final class RecordingFrames {
 
     Frame frame(int index) { return frames[index]; }
     boolean hidden(int index) { return hidden[index]; }
+    boolean beforeFirstVisible(int index) { return index < firstVisibleIndex; }
     Frame next(int index) { return index + 1 < frames.length ? frames[index + 1] : null; }
 }
