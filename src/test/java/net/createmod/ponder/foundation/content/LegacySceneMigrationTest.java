@@ -561,6 +561,9 @@ class LegacySceneMigrationTest {
                 .filter(event -> event.getType() == OverlayEventType.GUI_TEXTURE).toList();
             assertEquals(1, gui.size());
             assertNotNull(gui.get(0).getGuiSnapshotProvider());
+            assertTrue(scene.getOverlayEvents().stream().filter(event -> !event.getText().isEmpty())
+                .allMatch(event -> event.getTick() + event.getDuration() <= gui.get(0).getTick()),
+                "The summary must finish before the native GUI starts on its own page");
             assertTrue(scene.getOverlayEvents().stream().noneMatch(event -> event.getType() == OverlayEventType.GUI_HIGHLIGHT));
             assertEquals(expectedMetadata[index], ThermalExpansionScenes.thermalRecording(expectedMetadata[index])
                 .getAsJsonObject("source").get("meta").getAsInt());

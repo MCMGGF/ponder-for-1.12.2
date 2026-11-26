@@ -253,6 +253,7 @@ public final class ThermalExpansionScenes {
         if (!placeholder) {
             scene.overlay().showOutlineWithText(target, 30)
                 .colored(PonderPalette.BLUE).placeNearTarget().text(spec.summary);
+            scene.idle(30);
             PonderScene.OverlayEvent gui = bindMachineTarget(scene.getScene().createOverlayEvent(MAIN_GUI_DURATION))
                 .guiSnapshot(MACHINE_TABS).overlayId("main").offset(0, MAIN_GUI_OFFSET_Y).placeNearTarget(true);
             gui.setGuiSnapshotProvider(SandboxRecordings.onView(thermalRecording(spec.machineMeta), gui.getTick()));
