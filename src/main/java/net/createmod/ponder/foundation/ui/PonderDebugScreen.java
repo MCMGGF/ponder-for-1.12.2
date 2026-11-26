@@ -130,6 +130,7 @@ public class PonderDebugScreen extends CompatGuiScreen {
     private int debugTab;
     private PreviewDebugLayout debugLayout;
     private int playbackTick;
+    private boolean waitingForRecording;
     private final PreviewSoundPlayback previewAudio = new PreviewSoundPlayback();
     protected boolean playing;
 
@@ -541,6 +542,18 @@ public class PonderDebugScreen extends CompatGuiScreen {
             return;
         }
 
+        waitingForRecording = false;
+        for (PonderScene.OverlayEvent event : scene.getOverlayEvents()) {
+            if (event.getType() != PonderScene.OverlayEventType.GUI_TEXTURE || !isOverlayActive(event, playbackTick)
+                    || playbackTick - event.getTick() < Math.min(5, Math.max(0, event.getDuration() - 1))
+                    || scene.isOverlayCleared(event, playbackTick)) continue;
+            var provider = PonderGuiSnapshotRegistry.providerFor(event);
+            if (provider != null && provider.waitingForRecording()) {
+                waitingForRecording = true;
+                previewAudio.pause();
+                return;
+            }
+        }
         int maxTick = getSceneEndTick(scene);
         if (playbackTick < maxTick) {
             setPlaybackTick(playbackTick + 1, true);
@@ -3603,6 +3616,7 @@ public class PonderDebugScreen extends CompatGuiScreen {
     }
 
     private void setPlaybackTick(int tick, boolean automatic) {
+        waitingForRecording = false;
         if (modelMode.isAppearance()) {
             modelMode.chooseStructure();
         }
@@ -3750,7 +3764,7 @@ public class PonderDebugScreen extends CompatGuiScreen {
         if (scene == null) {
             return 0.0F;
         }
-        if (!playing) {
+        if (!playing || waitingForRecording) {
             return playbackTick;
         }
         return Math.min(getSceneEndTick(scene), playbackTick + Math.max(0.0F, partialTicks));

@@ -1,0 +1,54 @@
+{
+  "namespace": "ponder_demo",
+  "scenes": [
+    {
+      "component": "thermalexpansion:machine",
+      "componentMeta": 1,
+      "components": [
+        {"componentKey": "thermalexpansion:machine_pulverizer", "componentDisplayNbt": "{display:{Name:\"磨粉机\"}}"},
+        {"componentKey": "ponder_demo:sandbox_thermal_pulverizer"}
+      ],
+      "orderBefore": ["thermalexpansion:te_pulverizer_gui"],
+      "schematic": "ponder_legacy:mmce/empty",
+      "sceneId": "sandbox_thermal_pulverizer",
+      "title": "磨粉机将一根骨头磨成六份骨粉",
+      "operations": [
+        {"type": "base_plate", "xOffset": 0, "zOffset": 0, "size": 5},
+        {"type": "show_base_plate"},
+        {"type": "set_blocks", "from": [0, 0, 0], "to": [4, 0, 4], "state": "minecraft:stonebrick"},
+        {"type": "set_block", "pos": [2, 1, 2], "state": "thermalexpansion:machine", "meta": 1},
+        {"type": "idle", "ticks": 20},
+        {
+          "type": "show_gui_demo",
+          "id": "machine",
+          "duration": 380,
+          "demo": {
+            "source": {"type": "block_gui", "block": "thermalexpansion:machine", "meta": 1, "tileNbt": "{Energy:20000}", "capture": {"left": 96, "right": 24}},
+            "sandbox": {
+              "inventory": {"9": {"item": "minecraft:bone"}},
+              "actions": [
+                {"tick": 0, "type": "activate"},
+                {"tick": 1, "type": "wait_screen", "screen": "cofh.thermalexpansion.gui.client.machine.GuiPulverizer"},
+                {"tick": 2, "type": "wait_slot", "slot": 0, "stack": {"item": "minecraft:bone"}},
+                {"tick": 12, "type": "click", "x": -12, "y": 15},
+                {"tick": 40, "type": "click", "x": -12, "y": 15},
+                {"tick": 55, "type": "click", "slot": 0},
+                {"tick": 68, "type": "click", "slot": 36},
+                {"tick": 69, "type": "wait_slot", "slot": 36, "stack": {"item": "minecraft:bone"}},
+                {"tick": 75, "type": "wait_slot", "slot": 37, "stack": {"item": "minecraft:dye", "meta": 15, "count": 6}, "timeout": 500},
+                {"tick": 310, "type": "click", "slot": 37},
+                {"tick": 325, "type": "click", "slot": 1},
+                {"tick": 326, "type": "wait_slot", "slot": 1, "stack": {"item": "minecraft:dye", "meta": 15, "count": 6}},
+                {"tick": 330, "type": "wait_slot", "slot": 37, "stack": null}
+              ]
+            }
+          }
+        },
+        {"type": "idle", "ticks": 380},
+        {"type": "hide_gui_demo", "id": "machine"},
+        {"type": "idle", "ticks": 20},
+        {"type": "mark_finished"}
+      ]
+    }
+  ]
+}

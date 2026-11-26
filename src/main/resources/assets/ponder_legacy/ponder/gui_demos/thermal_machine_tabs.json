@@ -1,0 +1,20 @@
+{
+  "source": {
+    "type": "block_gui",
+    "block": "thermalexpansion:machine",
+    "tileNbt": "{Level:1b,Energy:20000}",
+    "capture": {"left": 24, "right": 112}
+  },
+  "sandbox": {
+    "actions": [
+      {"tick": 0, "type": "activate"},
+      {"tick": 40, "type": "click", "x": 185, "y": 59},
+      {"tick": 82, "type": "click", "x": 185, "y": 59},
+      {"tick": 100, "type": "click", "x": 185, "y": 15},
+      {"tick": 142, "type": "click", "x": 185, "y": 15},
+      {"tick": 160, "type": "click", "x": 185, "y": 37},
+      {"tick": 202, "type": "click", "x": 185, "y": 37},
+      {"tick": 224, "type": "wait_nbt", "nbt": "{Level:1b}"}
+    ]
+  }
+}

@@ -293,6 +293,8 @@ public final class PonderGuiSnapshotRegistry {
 
     public interface SnapshotProvider {
         Snapshot provide(float currentTick);
+
+        default boolean waitingForRecording() { return false; }
     }
 
     private static final class StaticSnapshotProvider implements SnapshotProvider {

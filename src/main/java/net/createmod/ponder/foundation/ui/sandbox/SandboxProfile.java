@@ -267,8 +267,7 @@ record SandboxProfile(Path game, Path assets, List<Pack> packs, String version, 
         Process child = builder.start();
         try {
             SandboxCacheMaintenance.trackWorker(job, child);
-            if (!child.waitFor(30, TimeUnit.MINUTES))
-                throw new IOException("Sandbox worker exceeded 30 minutes");
+            awaitWorker(child, job);
             Path error = job.resolve("error.txt");
             if (Files.exists(error)) throw new IOException(Files.readString(error));
             if (child.exitValue() != 0 || !Files.isRegularFile(job.resolve("frames.json")))
@@ -278,6 +277,35 @@ record SandboxProfile(Path game, Path assets, List<Pack> packs, String version, 
             throw new IOException("Interrupted while recording", interrupted);
         } finally {
             if (child.isAlive()) child.destroyForcibly().onExit().join();
+        }
+    }
+
+    static final class WorkerCrash extends IOException {
+        final Path report;
+        final boolean beforeScript;
+
+        WorkerCrash(Path job, Path report) {
+            super("Sandbox worker generated " + report.getFileName());
+            this.report = report;
+            this.beforeScript = !Files.exists(job.resolve("script-started"));
+        }
+    }
+
+    static void awaitWorker(Process child, Path job) throws IOException, InterruptedException {
+        Path reports = job.resolve("game/crash-reports");
+        long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(30);
+        while (true) {
+            boolean exited = child.waitFor(1, TimeUnit.SECONDS);
+            if (Files.isDirectory(reports, LinkOption.NOFOLLOW_LINKS)) {
+                try (var files = Files.newDirectoryStream(reports, "crash-*.txt")) {
+                    for (Path report : files) {
+                        if (Files.isRegularFile(report, LinkOption.NOFOLLOW_LINKS) && Files.size(report) > 0)
+                            throw new WorkerCrash(job, report);
+                    }
+                }
+            }
+            if (exited) return;
+            if (System.nanoTime() - deadline >= 0) throw new IOException("Sandbox worker exceeded 30 minutes");
         }
     }
 

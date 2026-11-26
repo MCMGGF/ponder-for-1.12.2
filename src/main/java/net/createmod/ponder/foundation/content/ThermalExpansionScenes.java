@@ -1,5 +1,11 @@
 package net.createmod.ponder.foundation.content;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 import net.createmod.ponder.Ponder;
@@ -12,8 +18,12 @@ import net.createmod.ponder.api.scene.Selection;
 import net.createmod.ponder.foundation.PonderIndex;
 import net.createmod.ponder.foundation.PonderScene;
 import net.createmod.ponder.foundation.registration.PonderComponentMatcher;
+import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition;
+import net.createmod.ponder.foundation.ui.sandbox.SandboxRecordings;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.IResource;
 import net.minecraft.init.Blocks;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
@@ -60,6 +70,7 @@ public final class ThermalExpansionScenes {
         new ResourceLocation("thermalexpansion", "machine_transposer");
 
     private static final int MAIN_GUI_DURATION = 240;
+    private static final ResourceLocation MACHINE_TABS = Ponder.asResource("ponder/gui_demos/thermal_machine_tabs.json");
     private static final BlockPos MACHINE_TARGET = new BlockPos(2, 2, 2);
     private static final ResourceLocation MACHINE_BLOCK = new ResourceLocation("thermalexpansion", "machine");
     private static final MachineStateResolver REGISTERED_MACHINE = metadata -> {
@@ -239,14 +250,22 @@ public final class ThermalExpansionScenes {
         scene.idle(10);
 
         Selection target = util.select().position(MACHINE_TARGET);
+        if (!placeholder) {
+            scene.overlay().showOutlineWithText(target, 30)
+                .colored(PonderPalette.BLUE).placeNearTarget().text(spec.summary);
+            PonderScene.OverlayEvent gui = bindMachineTarget(scene.getScene().createOverlayEvent(MAIN_GUI_DURATION))
+                .guiSnapshot(MACHINE_TABS).overlayId("main").offset(0, MAIN_GUI_OFFSET_Y).placeNearTarget(true);
+            gui.setGuiSnapshotProvider(SandboxRecordings.onView(thermalRecording(spec.machineMeta), gui.getTick()));
+            scene.idle(MAIN_GUI_DURATION);
+            scene.markAsFinished();
+            return;
+        }
         int walkthroughDuration = 18 + 16 + 16 + spec.mainCallouts.length * 18 + 3 * PANEL_GAP_TICKS + 12;
         scene.overlay().showOutline(PonderPalette.BLUE, "thermal.machine", target, walkthroughDuration);
         scene.overlay().showOutlineWithText(target, 70)
             .colored(PonderPalette.BLUE)
             .placeNearTarget()
-            .text(placeholder
-                ? "未加载对应机器，当前为 GUI 参考与铁块占位，不代表机器外观。" + spec.summary
-                : spec.summary);
+            .text("未加载对应机器，当前为 GUI 参考与铁块占位，不代表机器外观。" + spec.summary);
         enqueueGuiSnapshot(scene, Math.max(MAIN_GUI_DURATION, walkthroughDuration),
             snapshot("te_" + spec.machineName + "_live"), "main", anchor,
             0, MAIN_GUI_OFFSET_Y, null, 0, 0, false);
@@ -345,6 +364,32 @@ public final class ThermalExpansionScenes {
         return Ponder.asResource("gui_snapshot/" + path);
     }
 
+    static JsonObject thermalRecording(int metadata) {
+        Minecraft client = Minecraft.getMinecraft();
+        if (client != null && client.getResourceManager() != null) {
+            try (IResource resource = client.getResourceManager().getResource(MACHINE_TABS)) {
+                return readRecording(resource.getInputStream(), metadata);
+            } catch (IOException | RuntimeException error) {
+                Ponder.LOGGER.warn("Could not read {} from the active resources, using the bundled script", MACHINE_TABS, error);
+            }
+        }
+        String path = "/assets/" + MACHINE_TABS.getNamespace() + "/" + MACHINE_TABS.getPath();
+        try (InputStream stream = ThermalExpansionScenes.class.getResourceAsStream(path)) {
+            if (stream == null) throw new IOException("Missing " + path);
+            return readRecording(stream, metadata);
+        } catch (IOException error) {
+            throw new IllegalStateException("Cannot load the bundled Thermal machine recording", error);
+        }
+    }
+
+    private static JsonObject readRecording(InputStream stream, int metadata) {
+        JsonObject recording = new JsonParser().parse(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject();
+        recording.getAsJsonObject("source").addProperty("meta", metadata);
+        if (BlockGuiDemoDefinition.parse(recording).sandbox() == null)
+            throw new IllegalArgumentException("Expected a sandbox machine GUI script");
+        return recording;
+    }
+
     private static PonderScene.OverlayEvent bindMachineTarget(PonderScene.OverlayEvent event) {
         return event.pointAt(new Vec3d(MACHINE_TARGET.getX() + 0.5D, MACHINE_TARGET.getY() + 0.5D,
             MACHINE_TARGET.getZ() + 0.5D)).targetPositions(Collections.singletonList(MACHINE_TARGET));
@@ -353,7 +398,7 @@ public final class ThermalExpansionScenes {
     private static NBTTagCompound createDisplayNbt(String machineTitle) {
         NBTTagCompound root = new NBTTagCompound();
         NBTTagCompound display = new NBTTagCompound();
-        display.setString("Name", "{\"text\":\"" + machineTitle + "\"}");
+        display.setString("Name", machineTitle);
         root.setTag("display", display);
         return root;
     }

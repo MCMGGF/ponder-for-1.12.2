@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,6 +25,7 @@ import net.createmod.ponder.Ponder;
 import net.createmod.ponder.foundation.PonderIndex;
 import net.createmod.ponder.foundation.external.ExternalPonderScenes;
 import net.createmod.ponder.foundation.ui.BlockGuiDemoDefinition;
+import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.SnapshotProvider;
 import net.createmod.ponder.foundation.ui.sandbox.worker.SandboxWorker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.IReloadableResourceManager;
@@ -43,6 +45,10 @@ public final class SandboxRecordings {
         return thread;
     });
     private final Map<String, Path> published = new LinkedHashMap<>();
+    // Render and client tick share the client thread. The worker publishes status off-thread.
+    private final LinkedHashMap<String, JsonObject> viewed = new LinkedHashMap<>();
+    private final Map<String, String> status = new ConcurrentHashMap<>();
+    private final AtomicBoolean reloaded = new AtomicBoolean();
     private FileChannel cacheLease;
     private volatile long revision;
     private String language;
@@ -60,7 +66,25 @@ public final class SandboxRecordings {
             resources.registerReloadListener(ignored -> requestRefresh());
     }
 
-    public static void requestRefresh() { INSTANCE.dirty.set(true); }
+    public static void requestRefresh() {
+        INSTANCE.reloaded.set(true);
+        INSTANCE.dirty.set(true);
+    }
+
+    public static String statusMessage(String id) { return INSTANCE.status.get(id); }
+
+    public static SnapshotProvider onView(JsonObject definition, int startTick) {
+        String id = id(definition);
+        return RecordedGuiPlayback.provider(id, startTick, () -> INSTANCE.requestView(id, definition));
+    }
+
+    private void requestView(String id, JsonObject definition) {
+        if (viewed.containsKey(id)) return;
+        if (viewed.size() >= 64) viewed.pollLastEntry();
+        viewed.putFirst(id, definition);
+        status.putIfAbsent(id, "ponder.sandbox.waiting");
+        dirty.set(true);
+    }
 
     public static String id(JsonObject definition) {
         return HexFormat.of().formatHex(digest().digest(definition.toString().getBytes(StandardCharsets.UTF_8)));
@@ -83,7 +107,8 @@ public final class SandboxRecordings {
             dirty.set(true);
         }
         if (!dirty.getAndSet(false)) return;
-        Map<String, JsonObject> demos = new LinkedHashMap<>();
+        if (reloaded.getAndSet(false)) viewed.clear();
+        Map<String, JsonObject> demos = new LinkedHashMap<>(viewed);
         ExternalPonderScenes.visitGuiDemos(mc.getResourceManager(), timeline -> {
             if (timeline instanceof BlockGuiDemoDefinition demo && demo.sandbox() != null
                     && ForgeRegistries.BLOCKS.containsKey(demo.block())) {
@@ -92,10 +117,13 @@ public final class SandboxRecordings {
             }
         });
         long current = ++revision;
+        status.keySet().retainAll(demos.keySet());
+        demos.keySet().forEach(id -> status.putIfAbsent(id, "ponder.sandbox.waiting"));
         try {
             SandboxProfile profile = demos.isEmpty() ? null : SandboxProfile.capture(mc);
             executor.execute(() -> refresh(current, demos, profile));
         } catch (RuntimeException | LinkageError failure) {
+            demos.keySet().forEach(id -> status.put(id, "ponder.sandbox.failed"));
             Ponder.LOGGER.warn("Could not inspect the client profile for sandbox GUI recording", failure);
         }
     }
@@ -119,11 +147,13 @@ public final class SandboxRecordings {
                 try {
                     install(profile, environment, entry.getKey(), entry.getValue(), version);
                 } catch (IOException | RuntimeException failure) {
+                    if (revision == version) status.put(entry.getKey(), "ponder.sandbox.failed");
                     Ponder.LOGGER.warn("Sandbox GUI for {} could not be recorded", entry.getValue().get("source"), failure);
                 }
             }
             Ponder.LOGGER.info("Checked {} sandbox GUI recordings in {} ms", demos.size(), (System.nanoTime() - started) / 1000000);
         } catch (IOException | RuntimeException failure) {
+            if (revision == version) demos.keySet().forEach(id -> status.put(id, "ponder.sandbox.failed"));
             Ponder.LOGGER.warn("Could not prepare the sandbox recording environment", failure);
         }
     }
@@ -131,11 +161,15 @@ public final class SandboxRecordings {
     private void install(SandboxProfile profile, String environment, String id, JsonObject demo, long version) throws IOException {
         Path cache = profile.game().resolve("ponder-gui-cache");
         Path target = cache.resolve("recordings").resolve(id).resolve(environment);
-        if (target.equals(published.get(id))) return;
+        if (target.equals(published.get(id))) {
+            status.remove(id);
+            return;
+        }
         if (Files.isRegularFile(target.resolve("frames.json"))) {
             try {
                 RecordedGuiPlayback.publish(id, target);
                 published.put(id, target);
+                status.remove(id);
                 Ponder.LOGGER.info("Loaded cached sandbox GUI {}", demo.get("source"));
                 return;
             } catch (IOException corrupt) {
@@ -145,6 +179,18 @@ public final class SandboxRecordings {
         }
         Files.createDirectories(target.getParent());
         Path jobs = Files.createDirectories(cache.resolve("jobs"));
+        status.put(id, "ponder.sandbox.recording");
+        try {
+            recordAttempt(profile, id, demo, version, target, jobs, 1);
+        } catch (SandboxProfile.WorkerCrash crash) {
+            if (!crash.beforeScript || revision != version) throw crash;
+            Ponder.LOGGER.warn("Sandbox worker crashed before scripting {}; retrying in a new world", demo.get("source"));
+            recordAttempt(profile, id, demo, version, target, jobs, 2);
+        }
+    }
+
+    private void recordAttempt(SandboxProfile profile, String id, JsonObject demo, long version, Path target,
+            Path jobs, int attempt) throws IOException {
         Path job = Files.createTempDirectory(jobs, "record-");
         try {
             Files.writeString(job.resolve("job.json"), demo.toString());
@@ -163,16 +209,19 @@ public final class SandboxRecordings {
             if (revision == version) {
                 RecordedGuiPlayback.publish(id, target);
                 published.put(id, target);
+                status.remove(id);
             }
             Ponder.LOGGER.info("Recorded sandbox GUI {} at {}", demo.get("source"), target);
         } catch (IOException failure) {
+            Path cache = jobs.getParent();
             Path details = cache.resolve("last-error-" + id + ".log");
-            for (String name : List.of("error.txt", "worker.log")) {
-                Path log = job.resolve(name);
-                if (Files.isRegularFile(log)) {
-                    Files.copy(log, details, StandardCopyOption.REPLACE_EXISTING);
-                    break;
-                }
+            if (failure instanceof SandboxProfile.WorkerCrash crash) {
+                Files.copy(crash.report, cache.resolve("last-crash-" + id + "-" + attempt + ".log"),
+                    StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(crash.report, details, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Path log = Files.isRegularFile(job.resolve("error.txt")) ? job.resolve("error.txt") : job.resolve("worker.log");
+                if (Files.isRegularFile(log)) Files.copy(log, details, StandardCopyOption.REPLACE_EXISTING);
             }
             throw failure;
         } finally {

@@ -1,0 +1,58 @@
+{
+  "namespace": "ponder_demo",
+  "scenes": [
+    {
+      "component": "mekanism:machineblock",
+      "componentMeta": 0,
+      "componentKey": "ponder_demo:sandbox_mek_enrichment",
+      "schematic": "ponder_legacy:mmce/empty",
+      "sceneId": "sandbox_mek_enrichment",
+      "title": "富集仓：将红石压缩并取回",
+      "operations": [
+        {"type": "base_plate", "xOffset": 0, "zOffset": 0, "size": 5},
+        {"type": "show_base_plate"},
+        {"type": "set_blocks", "from": [0, 0, 0], "to": [4, 0, 4], "state": "minecraft:stonebrick"},
+        {"type": "set_block", "pos": [2, 1, 2], "state": "mekanism:machineblock", "meta": 0},
+        {"type": "idle", "ticks": 20},
+        {
+          "type": "show_gui_demo",
+          "id": "machine",
+          "duration": 405,
+          "demo": {
+            "source": {
+              "type": "block_gui",
+              "block": "mekanism:machineblock",
+              "meta": 0,
+              "tileNbt": "{electricityStored:20000.0d}",
+              "capture": {"left": 30, "right": 32}
+            },
+            "sandbox": {
+              "inventory": {"9": {"item": "minecraft:redstone"}},
+              "actions": [
+                {"tick": 0, "type": "activate"},
+                {"tick": 1, "type": "wait_screen", "screen": "GuiEnrichmentChamber"},
+                {"tick": 3, "type": "wait_slot", "slot": 5, "stack": {"item": "minecraft:redstone"}},
+                {"tick": 14, "type": "click", "x": -13, "y": 15},
+                {"tick": 47, "type": "close"},
+                {"tick": 60, "type": "activate"},
+                {"tick": 62, "type": "wait_screen", "screen": "GuiEnrichmentChamber"},
+                {"tick": 85, "type": "click", "slot": 5},
+                {"tick": 95, "type": "click", "slot": 2},
+                {"tick": 96, "type": "wait_slot", "slot": 2, "stack": {"item": "minecraft:redstone"}},
+                {"tick": 99, "type": "wait_slot", "slot": 3, "stack": {"item": "mekanism:compressedredstone"}, "timeout": 420},
+                {"tick": 330, "type": "click", "slot": 3},
+                {"tick": 345, "type": "click", "slot": 5},
+                {"tick": 347, "type": "wait_slot", "slot": 5, "stack": {"item": "mekanism:compressedredstone"}},
+                {"tick": 357, "type": "wait_slot", "slot": 3, "stack": null}
+              ]
+            }
+          }
+        },
+        {"type": "idle", "ticks": 405},
+        {"type": "hide_gui_demo", "id": "machine"},
+        {"type": "idle", "ticks": 20},
+        {"type": "mark_finished"}
+      ]
+    }
+  ]
+}

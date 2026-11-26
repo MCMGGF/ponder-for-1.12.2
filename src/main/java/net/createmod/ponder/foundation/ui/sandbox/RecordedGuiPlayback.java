@@ -16,6 +16,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import net.createmod.ponder.Ponder;
+import net.createmod.ponder.foundation.ui.PreviewTextLayout;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.ResettableSnapshotProvider;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.Snapshot;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.SnapshotProvider;
@@ -23,6 +24,8 @@ import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.SnapshotRend
 import net.createmod.ponder.foundation.ui.sandbox.RecordingFrames.Frame;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureUtil;
@@ -42,6 +45,8 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
     private static final long MAX_TEXTURE_BYTES = 64L * 1024 * 1024;
     private final String id;
     private final int startTick;
+    private final Runnable onView;
+    private Snapshot statusSnapshot;
     private RecordingFrames recording;
     private Snapshot snapshot;
     private Frame uploaded;
@@ -51,13 +56,18 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
     private Frame next;
     private FutureTask<BufferedImage> pending;
 
-    private RecordedGuiPlayback(String id, int startTick) {
+    private RecordedGuiPlayback(String id, int startTick, Runnable onView) {
         this.id = id;
         this.startTick = startTick;
+        this.onView = onView;
     }
 
     public static SnapshotProvider provider(String id, int startTick) {
-        return new RecordedGuiPlayback(id, startTick);
+        return provider(id, startTick, null);
+    }
+
+    public static SnapshotProvider provider(String id, int startTick, Runnable onView) {
+        return new RecordedGuiPlayback(id, startTick, onView);
     }
 
     public static void publish(String id, Path immutableGeneration) throws IOException {
@@ -67,9 +77,25 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
     public static void retain(Set<String> ids) { RECORDINGS.keySet().retainAll(ids); }
 
     @Override
+    public boolean waitingForRecording() {
+        if (statusSnapshot == null || recording != null || RECORDINGS.containsKey(id)) return false;
+        String state = SandboxRecordings.statusMessage(id);
+        return "ponder.sandbox.waiting".equals(state) || "ponder.sandbox.recording".equals(state);
+    }
+
+    @Override
     public Snapshot provide(float tick) {
         if (!Float.isFinite(tick) || tick < startTick) return null;
         if (recording == null) recording = RECORDINGS.get(id);
+        if (recording == null && onView != null) {
+            onView.run();
+            recording = RECORDINGS.get(id);
+            if (recording == null && SandboxRecordings.statusMessage(id) != null) {
+                if (statusSnapshot == null)
+                    statusSnapshot = Snapshot.liveRenderer(176, 40, true, this::renderStatus);
+                return statusSnapshot;
+            }
+        }
         if (recording == null) return null;
         int index = recording.indexAt((int) (tick - startTick));
         if (recording.hidden(index)) return null;
@@ -77,6 +103,22 @@ public final class RecordedGuiPlayback implements ResettableSnapshotProvider, Sn
         if (snapshot == null || snapshot.displayWidth != frame.width() || snapshot.displayHeight != frame.height())
             snapshot = Snapshot.liveRenderer(frame.width(), frame.height(), true, this);
         return snapshot;
+    }
+
+    private void renderStatus(int x, int y, int width, int height, float tick, float fade) {
+        String key = SandboxRecordings.statusMessage(id);
+        if (key == null || width < 12 || height <= 0) return;
+        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+        int alpha = Math.min(255, Math.round(255 * fade));
+        if (alpha < 4) return;
+        var lines = PreviewTextLayout.wrap(font, I18n.format(key), width - 8);
+        int lineY = y + Math.max(0, (height - lines.size() * font.FONT_HEIGHT) / 2);
+        for (String line : lines) {
+            if (lineY + font.FONT_HEIGHT > y + height) break;
+            font.drawStringWithShadow(line, x + (width - font.getStringWidth(line)) / 2f, lineY,
+                alpha << 24 | 0xFFFFFF);
+            lineY += font.FONT_HEIGHT;
+        }
     }
 
     @Override

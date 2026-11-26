@@ -9,7 +9,7 @@ import java.util.function.ToIntFunction;
 import net.minecraft.client.gui.FontRenderer;
 
 /** Use the active font for fitted labels and lossless multiline text. */
-final class PreviewTextLayout {
+public final class PreviewTextLayout {
 
     final String text;
     final int x;
@@ -34,7 +34,7 @@ final class PreviewTextLayout {
             fitted.width);
     }
 
-    static List<String> wrap(FontRenderer font, String text, int width) {
+    public static List<String> wrap(FontRenderer font, String text, int width) {
         return wrap(text, width, font::getStringWidth);
     }
 

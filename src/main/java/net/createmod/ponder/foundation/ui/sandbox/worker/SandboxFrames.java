@@ -36,26 +36,39 @@ final class SandboxFrames {
         Files.createDirectory(job.resolve("frames"));
     }
 
+    record Bounds(int left, int top, int right, int bottom) {
+        static Bounds container(int x, int y, int width, int height, Insets margins) {
+            return new Bounds(x - margins.left(), y - margins.top(),
+                x + width + margins.right(), y + height + margins.bottom());
+        }
+
+        Bounds visible(int width, int height) {
+            return new Bounds(Math.max(0, left), Math.max(0, top), Math.min(width, right), Math.min(height, bottom));
+        }
+
+        boolean fits(int width, int height) {
+            return left >= 0 && top >= 0 && right <= width && bottom <= height;
+        }
+    }
+
+    static Bounds requested(GuiContainer container, Insets margins) {
+        return Bounds.container(container.getGuiLeft(), container.getGuiTop(), container.getXSize(), container.getYSize(), margins);
+    }
+
     void capture(Minecraft mc, GuiScreen gui, Insets margins, int tick) throws IOException {
         if (tick == lastSample) return;
         int width = 1, height = 1;
         if (gui != null) {
-            int left = 0, top = 0;
-            width = gui.width;
-            height = gui.height;
-            if (gui instanceof GuiContainer container) {
-                left = container.getGuiLeft() - margins.left();
-                top = container.getGuiTop() - margins.top();
-                width = container.getXSize() + margins.left() + margins.right();
-                height = container.getYSize() + margins.top() + margins.bottom();
-            }
-            if (left < 0 || top < 0 ||
-                width < 1 || height < 1 || width > 4096 || height > 4096 ||
-                left + width > gui.width || top + height > gui.height)
-                throw new IOException("GUI capture exceeds worker viewport: " + width + "x" + height + " at " + left + "," + top);
+            Bounds visible = gui instanceof GuiContainer container
+                ? requested(container, margins).visible(gui.width, gui.height)
+                : new Bounds(0, 0, gui.width, gui.height);
+            width = visible.right() - visible.left();
+            height = visible.bottom() - visible.top();
+            if (width < 1 || height < 1 || width > 4096 || height > 4096)
+                throw new IOException("Invalid visible GUI capture: " + visible);
             int scale = new ScaledResolution(mc).getScaleFactor();
-            int x = left * scale;
-            int topPixel = top * scale;
+            int x = visible.left() * scale;
+            int topPixel = visible.top() * scale;
             int pixelWidth = Math.min(mc.displayWidth - x, width * scale);
             int pixelHeight = Math.min(mc.displayHeight - topPixel, height * scale);
             int pixelCount = Math.multiplyExact(pixelWidth, pixelHeight);

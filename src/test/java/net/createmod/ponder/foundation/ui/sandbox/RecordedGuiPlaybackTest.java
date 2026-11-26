@@ -16,6 +16,38 @@ class RecordedGuiPlaybackTest {
     @TempDir Path root;
 
     @Test
+    void activeRecordingWaitsForPublicationAndSeekingToHiddenFramesDoesNotBlockPlayback() throws Exception {
+        var raw = new com.google.gson.JsonObject();
+        raw.addProperty("test", "cold-cache");
+        String id = SandboxRecordings.id(raw);
+        SnapshotProvider player = SandboxRecordings.onView(raw, 20);
+        assertFalse(player.waitingForRecording());
+        assertNull(player.provide(19));
+        assertNotNull(player.provide(20));
+        assertTrue(player.waitingForRecording());
+        RecordedGuiPlayback.publish(id, generation("ready", 14, 24));
+        assertFalse(player.waitingForRecording());
+        assertNull(player.provide(26));
+        assertEquals(14, player.provide(20).displayWidth);
+    }
+
+    @Test
+    void requestsOnViewAfterTheOverlayStartsAndKeepsRecordedHiddenFramesHidden() throws Exception {
+        String id = "on-view";
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        SnapshotProvider player = RecordedGuiPlayback.provider(id, 12, calls::incrementAndGet);
+        assertNull(player.provide(Float.NaN));
+        assertNull(player.provide(11));
+        assertEquals(0, calls.get());
+        player.provide(12);
+        assertEquals(1, calls.get());
+        RecordedGuiPlayback.publish(id, generation("view", 15, 21));
+        assertEquals(15, player.provide(12).displayWidth);
+        assertNull(player.provide(18));
+        assertEquals(1, calls.get());
+    }
+
+    @Test
     void sparseFramesSeekInBothDirectionsAndHoldTheLastFrame() throws Exception {
         Path generation = generation("first", 11, 22);
         RecordedGuiPlayback.publish("seeking", generation);

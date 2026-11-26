@@ -20,7 +20,6 @@ import java.util.TreeMap;
 import java.util.function.Function;
 import net.createmod.ponder.foundation.ui.GuiDemoDefinition.Pointer;
 import net.createmod.ponder.foundation.ui.PonderGuiSnapshotRegistry.SnapshotProvider;
-import net.createmod.ponder.foundation.ui.sandbox.RecordedGuiPlayback;
 import net.createmod.ponder.foundation.ui.sandbox.SandboxRecordings;
 import net.minecraft.nbt.JsonToNBT;
 import net.minecraft.nbt.NBTException;
@@ -148,7 +147,7 @@ public final class BlockGuiDemoDefinition implements GuiDemoTimeline {
     @Override
     public SnapshotProvider provider(int startTick) {
         if (sandbox() != null) {
-            return RecordedGuiPlayback.provider(SandboxRecordings.id(rawJson()), startTick);
+            return SandboxRecordings.onView(rawJson(), startTick);
         }
         return BlockGuiDemoSnapshot.provider(this, startTick);
     }

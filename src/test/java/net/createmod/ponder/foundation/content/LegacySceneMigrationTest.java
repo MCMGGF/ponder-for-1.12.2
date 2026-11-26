@@ -557,6 +557,13 @@ class LegacySceneMigrationTest {
                 finalState(scene, new BlockPos(2, 2, 2)));
             assertFalse(scene.getOverlayEvents().stream().anyMatch(event -> event.getText() != null
                 && event.getText().contains("未加载对应机器")));
+            List<OverlayEvent> gui = scene.getOverlayEvents().stream()
+                .filter(event -> event.getType() == OverlayEventType.GUI_TEXTURE).toList();
+            assertEquals(1, gui.size());
+            assertNotNull(gui.get(0).getGuiSnapshotProvider());
+            assertTrue(scene.getOverlayEvents().stream().noneMatch(event -> event.getType() == OverlayEventType.GUI_HIGHLIGHT));
+            assertEquals(expectedMetadata[index], ThermalExpansionScenes.thermalRecording(expectedMetadata[index])
+                .getAsJsonObject("source").get("meta").getAsInt());
         }
     }
 

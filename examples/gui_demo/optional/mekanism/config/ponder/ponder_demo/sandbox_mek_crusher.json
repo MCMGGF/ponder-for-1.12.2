@@ -1,0 +1,54 @@
+{
+  "namespace": "ponder_demo",
+  "scenes": [
+    {
+      "component": "mekanism:machineblock",
+      "componentMeta": 3,
+      "componentKey": "ponder_demo:sandbox_mek_crusher",
+      "schematic": "ponder_legacy:mmce/empty",
+      "sceneId": "sandbox_mek_crusher",
+      "title": "粉碎机：将圆石粉碎为沙砾",
+      "operations": [
+        {"type": "base_plate", "xOffset": 0, "zOffset": 0, "size": 5},
+        {"type": "show_base_plate"},
+        {"type": "set_blocks", "from": [0, 0, 0], "to": [4, 0, 4], "state": "minecraft:stonebrick"},
+        {"type": "set_block", "pos": [2, 1, 2], "state": "mekanism:machineblock", "meta": 3},
+        {"type": "idle", "ticks": 20},
+        {
+          "type": "show_gui_demo",
+          "id": "machine",
+          "duration": 342,
+          "demo": {
+            "source": {
+              "type": "block_gui",
+              "block": "mekanism:machineblock",
+              "meta": 3,
+              "tileNbt": "{electricityStored:20000.0d}",
+              "capture": {"left": 30, "right": 32}
+            },
+            "sandbox": {
+              "inventory": {"9": {"item": "minecraft:cobblestone"}},
+              "actions": [
+                {"tick": 0, "type": "activate"},
+                {"tick": 1, "type": "wait_screen", "screen": "GuiCrusher"},
+                {"tick": 3, "type": "wait_slot", "slot": 5, "stack": {"item": "minecraft:cobblestone"}},
+                {"tick": 22, "type": "click", "slot": 5},
+                {"tick": 32, "type": "click", "slot": 2},
+                {"tick": 33, "type": "wait_slot", "slot": 2, "stack": {"item": "minecraft:cobblestone"}},
+                {"tick": 36, "type": "wait_slot", "slot": 3, "stack": {"item": "minecraft:gravel"}, "timeout": 420},
+                {"tick": 267, "type": "click", "slot": 3},
+                {"tick": 282, "type": "click", "slot": 5},
+                {"tick": 284, "type": "wait_slot", "slot": 5, "stack": {"item": "minecraft:gravel"}},
+                {"tick": 294, "type": "wait_slot", "slot": 3, "stack": null}
+              ]
+            }
+          }
+        },
+        {"type": "idle", "ticks": 342},
+        {"type": "hide_gui_demo", "id": "machine"},
+        {"type": "idle", "ticks": 20},
+        {"type": "mark_finished"}
+      ]
+    }
+  ]
+}

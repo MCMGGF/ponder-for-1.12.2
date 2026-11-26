@@ -18,6 +18,7 @@ import net.createmod.ponder.foundation.ui.SandboxGuiScript.Action;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.server.integrated.IntegratedServer;
@@ -90,7 +91,10 @@ public final class SandboxWorker {
                         if (fixture.clientReady(mc)) {
                             if (assertion == null) assertion = fixture.server().callFromMainThread(fixture::serverReady);
                             if (assertion.isDone()) {
-                                if (assertion.get()) phase = Phase.RECORD;
+                                if (assertion.get()) {
+                                    Files.createFile(job.resolve("script-started"));
+                                    phase = Phase.RECORD;
+                                }
                                 assertion = null;
                             }
                         }
@@ -145,6 +149,7 @@ public final class SandboxWorker {
     }
 
     private void advance() throws Exception {
+        if (mc.currentScreen instanceof GuiContainer container) fitCapture(container);
         if (++tick >= 24_000) throw new IllegalStateException("Recording exceeded 24000 ticks");
         if (mc.world == null || mc.player == null || mc.getIntegratedServer() != fixture.server() ||
             mc.getConnection() == null || !mc.getConnection().getNetworkManager().isLocalChannel())
@@ -162,6 +167,20 @@ public final class SandboxWorker {
         assertion = null;
         activated = false;
         if (++index == actions.size()) phase = Phase.FINAL_FRAME;
+    }
+
+    private void fitCapture(GuiContainer container) {
+        ScaledResolution resolution = new ScaledResolution(mc);
+        while (!SandboxFrames.requested(container, definition.capture()).fits(container.width, container.height)
+                && resolution.getScaleFactor() > 1) {
+            mc.gameSettings.guiScale = resolution.getScaleFactor() - 1;
+            resolution = new ScaledResolution(mc);
+            int oldLeft = container.getGuiLeft();
+            int oldTop = container.getGuiTop();
+            container.onResize(mc, resolution.getScaledWidth(), resolution.getScaledHeight());
+            pointerX += container.getGuiLeft() - oldLeft;
+            pointerY += container.getGuiTop() - oldTop;
+        }
     }
 
     private boolean perform(Action action) throws Exception {
@@ -247,6 +266,12 @@ public final class SandboxWorker {
     private void sample(GuiScreen gui) {
         if (tick < 0 || phase != Phase.RECORD && phase != Phase.FINAL_FRAME) return;
         try {
+            // A screen may open between ticks. Its first published image must use the fitted layout.
+            if (gui instanceof GuiContainer container && new ScaledResolution(mc).getScaleFactor() > 1
+                    && !SandboxFrames.requested(container, definition.capture()).fits(gui.width, gui.height)) {
+                fitCapture(container);
+                return;
+            }
             frames.capture(mc, gui, definition.capture(), tick);
             if (phase == Phase.FINAL_FRAME) {
                 frames.finish(tick + 1);

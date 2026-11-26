@@ -434,7 +434,9 @@ tasks.register('sandboxExampleZips') {
 
 [
     sandboxFurnaceZip: ['examples/gui_demo', 'sandbox_furnace', 'ponder-sandbox-furnace'],
-    sandboxInscriberZip: ['examples/gui_demo/optional/ae2s', 'sandbox_ae2s_inscriber', 'ponder-sandbox-ae2s-inscriber']
+    sandboxInscriberZip: ['examples/gui_demo/optional/ae2s', 'sandbox_ae2s_inscriber', 'ponder-sandbox-ae2s-inscriber'],
+    sandboxMekanismZip: ['examples/gui_demo/optional/mekanism', 'sandbox_mek_*', 'ponder-sandbox-mekanism'],
+    sandboxThermalZip: ['examples/gui_demo/optional/thermalexpansion', 'sandbox_thermal_*', 'ponder-sandbox-thermal-expansion']
 ].each { name, spec ->
     def example = tasks.register(name, Zip) {
         from(spec[0]) { include "config/ponder/ponder_demo/${spec[1]}.json" }
